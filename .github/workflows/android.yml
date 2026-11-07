@@ -33,7 +33,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           p = Path("pubspec.yaml")
-          p.write_text(p.read_text().replace("intl: ^0.18.1", "intl: ^0.19.0"))
+          text = p.read_text().replace("intl: ^0.18.1", "intl: ^0.19.0")
+          if "dependency_overrides:" not in text:
+              text += "\n\ndependency_overrides:\n  win32: 5.5.1\n"
+          p.write_text(text)
           PY
 
       - name: Install dependencies
