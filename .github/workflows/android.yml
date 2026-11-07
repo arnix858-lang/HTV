@@ -405,6 +405,51 @@ jobs:
           ''')
           PY
 
+      - name: Show update notification on app launch
+        working-directory: source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("lib/pages/iptv/view.dart")
+          s = p.read_text()
+          old = """    updateStore.loadCurrentVersion();
+              updateStore.refreshLatestRelease();
+            }"""
+          new = """    await updateStore.loadCurrentVersion();
+              await updateStore.refreshLatestRelease();
+              if (mounted && updateStore.hasUpdate && updateStore.latestRelease.downloadUrl.isNotEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  showDialog<void>(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Доступно обновление HTV'),
+                      content: Text('Новая версия: ${updateStore.latestRelease.tagName}\\n\\n${updateStore.latestRelease.description.isEmpty ? "Исправления и улучшения приложения." : updateStore.latestRelease.description}'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const Text('Позже'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            updateStore.downloadAndInstall();
+                          },
+                          child: const Text('Скачать и установить'),
+                        ),
+                      ],
+                    ),
+                  );
+                });
+              }
+            }"""
+          if old not in s:
+              raise SystemExit("Could not find app startup update-check block")
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
       - name: Install dependencies
         working-directory: source
         run: flutter pub get
