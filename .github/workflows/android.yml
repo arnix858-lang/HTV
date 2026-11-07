@@ -277,6 +277,170 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Improve responsive layout and text on phones, tablets and TVs
+        working-directory: source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # The app is a landscape-first IPTV player. Use a proportional panel width
+          # with sensible limits so it remains usable on phones, tablets and large TVs.
+          p = Path("lib/pages/panel/view.dart")
+          s = p.read_text()
+          s = s.replace(
+              """      child: SizedBox(
+        width: 360.w,
+        child: Container(
+          padding: const EdgeInsets.only(left: 40).r,
+          child: _buildPanelContent(),
+        ),
+      ),""",
+              """      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          final panelWidth = (screenWidth * 0.30).clamp(280.0, 560.0);
+          final horizontalPadding = (panelWidth * 0.08).clamp(16.0, 40.0);
+          return SizedBox(
+            width: panelWidth,
+            child: Padding(
+              padding: EdgeInsets.only(left: horizontalPadding, right: 12),
+              child: _buildPanelContent(),
+            ),
+          );
+        },
+      ),"""
+          )
+          p.write_text(s)
+
+          # Long channel names, EPG titles and error messages must never push
+          # neighboring widgets off-screen.
+          p = Path("lib/pages/panel/widgets/iptv_info.dart")
+          s = p.read_text()
+          s = s.replace(
+              """            Observer(
+              builder: (_) => Text(
+                iptvStore.currentIptv.name,
+                style: AppTheme.text(fg, 60.sp, weight: FontWeight.bold),
+              ),
+            ),""",
+              """            Expanded(
+              child: Observer(
+                builder: (_) => Text(
+                  iptvStore.currentIptv.name,
+                  style: AppTheme.text(fg, 60.sp, weight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+              ),
+              ),
+            ),"""
+          )
+          s = s.replace("SizedBox(width: 40.w),", "SizedBox(width: 16.w),")
+          s = s.replace(
+              """                return Text(
+                  '${playerStore.errorInfo}播放失败！',
+                  style: AppTheme.text(AppTheme.error(context), 20.sp, weight: FontWeight.bold),
+                );""",
+              """                return Flexible(
+                  child: Text(
+                    '${playerStore.errorInfo}播放失败！',
+                    style: AppTheme.text(AppTheme.error(context), 20.sp, weight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );"""
+          )
+          s = s.replace(
+              """            style: AppTheme.text(programmeColor, 30.sp),
+          ),""",
+              """            style: AppTheme.text(programmeColor, 30.sp),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),"""
+          )
+          p.write_text(s)
+
+          p = Path("lib/pages/panel/widgets/iptv_list.dart")
+          s = p.read_text()
+          s = s.replace("maxLines: 1,\n        ),", "maxLines: 2,\n          overflow: TextOverflow.ellipsis,\n        ),", 1)
+          s = s.replace(
+              """                      maxLines: 1,
+                    ),""",
+              """                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),"""
+          )
+          s = s.replace(
+              """              maxLines: 1,
+            ),""",
+              """              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),"""
+          )
+          p.write_text(s)
+
+          # Adapt settings cards to the actual available width and avoid clipped labels.
+          p = Path("lib/pages/settings/widgets/settings.dart")
+          s = p.read_text()
+          s = s.replace(
+              """    return SizedBox(
+        height: 190.w + 20.h,
+        child: TwoDimensionListView(
+        size: (rowHeight: 190.w, colWidth: 400.w),""",
+              """    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth * 0.42).clamp(260.0, 520.0);
+        final cardHeight = (constraints.maxHeight * 0.82).clamp(140.0, 220.0);
+        return SizedBox(
+        height: cardHeight + 20.h,
+        child: TwoDimensionListView(
+        size: (rowHeight: cardHeight, colWidth: cardWidth),"""
+          )
+          s = s.replace(
+              """      ),
+    );
+  }
+
+  Widget _buildSettingItem""",
+              """      ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSettingItem""",
+              1
+          )
+          s = s.replace(
+              """              Text(
+                item.title,
+                style: AppTheme.text(textColor, 30.sp),
+              ),
+              Text(
+                item.value(),
+                style: AppTheme.text(textColor, 30.sp),
+              ),""",
+              """              Expanded(
+                child: Text(
+                  item.title,
+                  style: AppTheme.text(textColor, 30.sp),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  item.value(),
+                  style: AppTheme.text(textColor, 30.sp),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                ),
+              ),"""
+          )
+          p.write_text(s)
+          PY
+
       - name: Fix intl constraint for Flutter 3.24.5
         working-directory: source
         run: |
