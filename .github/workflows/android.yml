@@ -464,7 +464,7 @@ jobs:
           p = Path("pubspec.yaml")
           s = p.read_text()
           run = os.environ["GITHUB_RUN_NUMBER"]
-          s, n = re.subn(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+", lambda m: f"version: {m.group(1)}.{run}+{run}", s, count=1, flags=re.M)
+          s, n = re.subn(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+", lambda m: f"version: 6.0.{run}+{run}", s, count=1, flags=re.M)
           if n != 1:
               raise SystemExit("Could not set an increasing app version")
           p.write_text(s)
