@@ -289,37 +289,40 @@ jobs:
           p.write_text(text)
           PY
 
-      - name: Configure GitHub in-app updater
+      - name: Configure in-app GitHub updater
         working-directory: source
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          # Point the built-in updater to this customized app's releases.
+          # Configure this repository as the release source.
           p = Path("lib/common/values/constants.dart")
           s = p.read_text()
-          s = s.replace("https://api.github.com/repos/HTWMedia/HTV/releases/latest", "https://api.github.com/repos/arnix858-lang/HTV/releases/latest")
-          s = s.replace("https://github.com/HTWMedia/HTV/releases/latest", "https://github.com/arnix858-lang/HTV/releases/latest")
+          s = s.replace(
+              "https://api.github.com/repos/HTWMedia/HTV/releases/latest",
+              "https://api.github.com/repos/arnix858-lang/HTV/releases/latest")
+          s = s.replace(
+              "https://github.com/HTWMedia/HTV/releases/latest",
+              "https://github.com/arnix858-lang/HTV/releases/latest")
           p.write_text(s)
 
-          # Select the APK asset explicitly and use Android's package installer
-          # through a platform channel (Dart Process.run('am') is not available to apps).
+          # Download the APK asset rather than the first arbitrary release asset.
           p = Path("lib/common/stores/update.dart")
           s = p.read_text()
-          s = s.replace("import 'dart:io';", "import 'dart:io';\nimport 'package:flutter/services.dart';")
-          s = s.replace(
-              """downloadUrl: result['assets'] != null && result['assets'].isNotEmpty
+          s = s.replace("import 'dart:io';",
+                        "import 'dart:io';\\nimport 'package:flutter/services.dart';")
+          old = """downloadUrl: result['assets'] != null && result['assets'].isNotEmpty
                   ? result['assets'][0]['browser_download_url'] ?? ''
-                  : '',""",
-              """downloadUrl: result['assets'] is List
+                  : '',"""
+          new = """downloadUrl: result['assets'] is List
                   ? ((result['assets'] as List).cast<Map>().firstWhere(
                       (asset) => (asset['name'] ?? '').toString().toLowerCase().endsWith('.apk'),
                       orElse: () => <String, dynamic>{},
                     )['browser_download_url'] ?? '').toString()
                   : '',"""
-          )
-          s = s.replace(
-              """  Future<void> _installApk(String path) async {
+          if old in s:
+              s = s.replace(old, new)
+          old_install = """  Future<void> _installApk(String path) async {
               try {
                 await Process.run('am', [
                   'start',
@@ -330,8 +333,8 @@ jobs:
               } catch (e) {
                 _logger.error('安装失败: $e');
               }
-            }""",
-              """  Future<void> _installApk(String path) async {
+            }"""
+          new_install = """  Future<void> _installApk(String path) async {
               try {
                 const channel = MethodChannel('com.htwmedia.htv/updater');
                 await channel.invokeMethod('installApk', {'path': path});
@@ -340,96 +343,95 @@ jobs:
                 downloadProgress = 'Не удалось открыть установщик';
               }
             }"""
-          )
-          if "com.htwmedia.htv/updater" not in s:
-              raise SystemExit("Could not patch Android APK installer")
-          if "arnix858-lang/HTV/releases/latest" not in Path("lib/common/values/constants.dart").read_text():
-              raise SystemExit("Could not redirect update API")
+          if old_install in s:
+              s = s.replace(old_install, new_install)
+          if "MethodChannel('com.htwmedia.htv/updater')" not in s:
+              raise SystemExit("Updater Dart installer patch did not apply")
           p.write_text(s)
 
-          # Install APK through a content:// URI exposed by AndroidX FileProvider.
+          # Add Android's FileProvider installer bridge without replacing existing security handlers.
           p = Path("android/app/src/main/kotlin/io/flutter/plugins/MainActivity.kt")
           s = p.read_text()
-          s = s.replace("import android.os.Build", """import android.os.Build
-          import android.content.Intent
-          import android.net.Uri
-          import androidx.core.content.FileProvider""")
-          s = s.replace(
-              '        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler',
-              """        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.htwmedia.htv/updater").setMethodCallHandler { call, result ->
-              if (call.method == "installApk") {
-                  try {
-                      val path = call.argument<String>("path") ?: throw IllegalArgumentException("APK path missing")
-                      val apk = File(path)
-                      if (!apk.exists()) throw IllegalArgumentException("APK file not found")
-                      val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
-                      val intent = Intent(Intent.ACTION_VIEW).apply {
-                          setDataAndType(uri, "application/vnd.android.package-archive")
-                          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+          if "com.htwmedia.htv/updater" not in s:
+              s = s.replace("import android.os.Build",
+                            "import android.os.Build\\nimport android.content.Intent\\nimport android.net.Uri\\nimport androidx.core.content.FileProvider")
+              marker = "        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler"
+              bridge = '''        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.htwmedia.htv/updater").setMethodCallHandler { call, result ->
+                  if (call.method == "installApk") {
+                      try {
+                          val path = call.argument<String>("path") ?: throw IllegalArgumentException("APK path missing")
+                          val apk = File(path)
+                          if (!apk.exists()) throw IllegalArgumentException("APK file not found")
+                          val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+                          val intent = Intent(Intent.ACTION_VIEW).apply {
+                              setDataAndType(uri, "application/vnd.android.package-archive")
+                              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                              addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                          }
+                          startActivity(intent)
+                          result.success(true)
+                      } catch (e: Exception) {
+                          result.error("INSTALL_FAILED", e.message, null)
                       }
-                      startActivity(intent)
-                      result.success(true)
-                  } catch (e: Exception) {
-                      result.error("INSTALL_FAILED", e.message, null)
+                  } else {
+                      result.notImplemented()
                   }
-              } else {
-                  result.notImplemented()
               }
-          }
 
-          MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler"""
-          )
-          if '"com.htwmedia.htv/updater"' not in s:
-              raise SystemExit("Could not add updater MethodChannel")
+          '''
+              if marker not in s:
+                  raise SystemExit("MainActivity MethodChannel marker not found")
+              s = s.replace(marker, bridge + marker, 1)
           p.write_text(s)
 
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-          s = s.replace('<uses-permission android:name="android.permission.INTERNET"/>',
-                        '<uses-permission android:name="android.permission.INTERNET"/>\n  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>')
-          s = s.replace('    <receiver android:name="io.flutter.plugins.BootReceiver"', """    <provider
-      android:name="androidx.core.content.FileProvider"
-      android:authorities="com.htwmedia.htv.fileprovider"
-      android:exported="false"
-      android:grantUriPermissions="true">
-      <meta-data
-        android:name="android.support.FILE_PROVIDER_PATHS"
-        android:resource="@xml/file_paths" />
-    </provider>
-
-    <receiver android:name="io.flutter.plugins.BootReceiver" """)
+          if "REQUEST_INSTALL_PACKAGES" not in s:
+              s = s.replace('<uses-permission android:name="android.permission.INTERNET"/>',
+                            '<uses-permission android:name="android.permission.INTERNET"/>\\n  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>')
+          if "com.htwmedia.htv.fileprovider" not in s:
+              provider = '''    <provider
+              android:name="androidx.core.content.FileProvider"
+              android:authorities="com.htwmedia.htv.fileprovider"
+              android:exported="false"
+              android:grantUriPermissions="true">
+              <meta-data
+                  android:name="android.support.FILE_PROVIDER_PATHS"
+                  android:resource="@xml/file_paths" />
+          </provider>
+          '''
+              s = s.replace('    <receiver android:name="io.flutter.plugins.BootReceiver"', provider + '    <receiver android:name="io.flutter.plugins.BootReceiver"', 1)
           p.write_text(s)
 
-          p = Path("android/app/src/main/res/xml/file_paths.xml")
-          p.write_text('''<?xml version="1.0" encoding="utf-8"?>
+          paths = Path("android/app/src/main/res/xml")
+          paths.mkdir(parents=True, exist_ok=True)
+          (paths / "file_paths.xml").write_text('''<?xml version="1.0" encoding="utf-8"?>
           <paths xmlns:android="http://schemas.android.com/apk/res/android">
-            <cache-path name="updates" path="." />
+              <cache-path name="updates" path="." />
           </paths>
           ''')
           PY
 
-      - name: Show update notification on app launch
+      - name: Check for update dialog on app start
         working-directory: source
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path("lib/pages/iptv/view.dart")
           s = p.read_text()
-          old = """    updateStore.loadCurrentVersion();
-              updateStore.refreshLatestRelease();
-            }"""
-          new = """    await updateStore.loadCurrentVersion();
+          marker = """    updateStore.loadCurrentVersion();
+              updateStore.refreshLatestRelease();"""
+          if "Доступно обновление HTV" not in s:
+              dialog = """    await updateStore.loadCurrentVersion();
               await updateStore.refreshLatestRelease();
               if (mounted && updateStore.hasUpdate && updateStore.latestRelease.downloadUrl.isNotEmpty) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
                   showDialog<void>(
                     context: context,
-                    barrierDismissible: true,
                     builder: (dialogContext) => AlertDialog(
                       title: const Text('Доступно обновление HTV'),
-                      content: Text('Новая версия: ${updateStore.latestRelease.tagName}\\n\\n${updateStore.latestRelease.description.isEmpty ? "Исправления и улучшения приложения." : updateStore.latestRelease.description}'),
+                      content: Text('Новая версия: ${updateStore.latestRelease.tagName}'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(dialogContext).pop(),
@@ -446,12 +448,11 @@ jobs:
                     ),
                   );
                 });
-              }
-            }"""
-          if old not in s:
-              raise SystemExit("Could not find app startup update-check block")
-          s = s.replace(old, new, 1)
-          p.write_text(s)
+              }"""
+              if marker not in s:
+                  raise SystemExit("Could not locate update check calls in IPTV page")
+              s = s.replace(marker, dialog, 1)
+              p.write_text(s)
           PY
 
       - name: Install dependencies
