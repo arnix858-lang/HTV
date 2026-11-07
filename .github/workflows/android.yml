@@ -27,6 +27,22 @@ jobs:
           flutter-version: '3.24.5'
           cache: true
 
+      - name: Set Russian as the default app language
+        working-directory: source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("lib/main.dart")
+          text = p.read_text()
+          text = text.replace(
+              'supportedLocales: const [Locale("zh", "CH"), Locale("en", "US")],',
+              'locale: const Locale("ru", "RU"),\n            supportedLocales: const [Locale("ru", "RU"), Locale("zh", "CN"), Locale("en", "US")],'
+          )
+          if 'locale: const Locale("ru", "RU")' not in text:
+              raise SystemExit("Could not find MaterialApp supportedLocales declaration")
+          p.write_text(text)
+          PY
+
       - name: Fix intl constraint for Flutter 3.24.5
         working-directory: source
         run: |
