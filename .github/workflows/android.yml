@@ -286,6 +286,125 @@ jobs:
           p.write_text(text)
           PY
 
+      - name: Configure GitHub in-app updater
+        working-directory: source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Point the built-in updater to this customized app's releases.
+          p = Path("lib/common/values/constants.dart")
+          s = p.read_text()
+          s = s.replace("https://api.github.com/repos/HTWMedia/HTV/releases/latest", "https://api.github.com/repos/arnix858-lang/HTV/releases/latest")
+          s = s.replace("https://github.com/HTWMedia/HTV/releases/latest", "https://github.com/arnix858-lang/HTV/releases/latest")
+          p.write_text(s)
+
+          # Select the APK asset explicitly and use Android's package installer
+          # through a platform channel (Dart Process.run('am') is not available to apps).
+          p = Path("lib/common/stores/update.dart")
+          s = p.read_text()
+          s = s.replace(
+              """downloadUrl: result['assets'] != null && result['assets'].isNotEmpty
+                  ? result['assets'][0]['browser_download_url'] ?? ''
+                  : '',""",
+              """downloadUrl: result['assets'] is List
+                  ? ((result['assets'] as List).cast<Map>().firstWhere(
+                      (asset) => (asset['name'] ?? '').toString().toLowerCase().endsWith('.apk'),
+                      orElse: () => <String, dynamic>{},
+                    )['browser_download_url'] ?? '').toString()
+                  : '',"""
+          )
+          s = s.replace(
+              """  Future<void> _installApk(String path) async {
+              try {
+                await Process.run('am', [
+                  'start',
+                  '-a', 'android.intent.action.VIEW',
+                  '-d', 'file://$path',
+                  '-t', 'application/vnd.android.package-archive',
+                ]);
+              } catch (e) {
+                _logger.error('安装失败: $e');
+              }
+            }""",
+              """  Future<void> _installApk(String path) async {
+              try {
+                const channel = MethodChannel('com.htwmedia.htv/updater');
+                await channel.invokeMethod('installApk', {'path': path});
+              } catch (e) {
+                _logger.error('Не удалось открыть установщик Android: $e');
+                downloadProgress = 'Не удалось открыть установщик';
+              }
+            }"""
+          )
+          if "com.htwmedia.htv/updater" not in s:
+              raise SystemExit("Could not patch Android APK installer")
+          if "arnix858-lang/HTV/releases/latest" not in Path("lib/common/values/constants.dart").read_text():
+              raise SystemExit("Could not redirect update API")
+          p.write_text(s)
+
+          # Install APK through a content:// URI exposed by AndroidX FileProvider.
+          p = Path("android/app/src/main/kotlin/io/flutter/plugins/MainActivity.kt")
+          s = p.read_text()
+          s = s.replace("import android.os.Build", """import android.os.Build
+          import android.content.Intent
+          import android.net.Uri
+          import androidx.core.content.FileProvider""")
+          s = s.replace(
+              '        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler',
+              """        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.htwmedia.htv/updater").setMethodCallHandler { call, result ->
+              if (call.method == "installApk") {
+                  try {
+                      val path = call.argument<String>("path") ?: throw IllegalArgumentException("APK path missing")
+                      val apk = File(path)
+                      if (!apk.exists()) throw IllegalArgumentException("APK file not found")
+                      val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+                      val intent = Intent(Intent.ACTION_VIEW).apply {
+                          setDataAndType(uri, "application/vnd.android.package-archive")
+                          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                      }
+                      startActivity(intent)
+                      result.success(true)
+                  } catch (e: Exception) {
+                      result.error("INSTALL_FAILED", e.message, null)
+                  }
+              } else {
+                  result.notImplemented()
+              }
+          }
+
+          MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler"""
+          )
+          if '"com.htwmedia.htv/updater"' not in s:
+              raise SystemExit("Could not add updater MethodChannel")
+          p.write_text(s)
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace('<uses-permission android:name="android.permission.INTERNET"/>',
+                        '<uses-permission android:name="android.permission.INTERNET"/>\n  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>')
+          s = s.replace('    <receiver android:name="io.flutter.plugins.BootReceiver"', """    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="com.htwmedia.htv.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/file_paths" />
+    </provider>
+
+    <receiver android:name="io.flutter.plugins.BootReceiver"""")
+          p.write_text(s)
+
+          p = Path("android/app/src/main/res/xml/file_paths.xml")
+          p.write_text('''<?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+            <cache-path name="updates" path="." />
+          </paths>
+          ''')
+          PY
+
       - name: Install dependencies
         working-directory: source
         run: flutter pub get
