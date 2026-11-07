@@ -159,7 +159,7 @@ jobs:
           for p in files:
               source = p.read_text()
               updated = source
-              for old, new in replacements.items():
+              for old, new in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
                   updated = updated.replace(old, new)
               if updated != source:
                   p.write_text(updated)
