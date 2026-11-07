@@ -303,6 +303,7 @@ jobs:
           # through a platform channel (Dart Process.run('am') is not available to apps).
           p = Path("lib/common/stores/update.dart")
           s = p.read_text()
+          s = s.replace("import 'dart:io';", "import 'dart:io';\\nimport 'package:flutter/services.dart';")
           s = s.replace(
               """downloadUrl: result['assets'] != null && result['assets'].isNotEmpty
                   ? result['assets'][0]['browser_download_url'] ?? ''
@@ -394,7 +395,7 @@ jobs:
         android:resource="@xml/file_paths" />
     </provider>
 
-    <receiver android:name="io.flutter.plugins.BootReceiver"""")
+    <receiver android:name="io.flutter.plugins.BootReceiver" />""")
           p.write_text(s)
 
           p = Path("android/app/src/main/res/xml/file_paths.xml")
@@ -463,7 +464,7 @@ jobs:
           p = Path("pubspec.yaml")
           s = p.read_text()
           run = os.environ["GITHUB_RUN_NUMBER"]
-          s, n = re.subn(r"^version:\s*([0-9]+\\.[0-9]+\\.[0-9]+)\\+[0-9]+", lambda m: f"version: {m.group(1)}.{run}+{run}", s, count=1, flags=re.M)
+          s, n = re.subn(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+", lambda m: f"version: {m.group(1)}.{run}+{run}", s, count=1, flags=re.M)
           if n != 1:
               raise SystemExit("Could not set an increasing app version")
           p.write_text(s)
