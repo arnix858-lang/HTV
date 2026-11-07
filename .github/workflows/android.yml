@@ -24,7 +24,11 @@ jobs:
       - name: Fix intl constraint for current Flutter SDK
         working-directory: source
         run: |
-          sed -i '/^  intl:/c\\  intl: ^0.20.3' pubspec.yaml
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("pubspec.yaml")
+          p.write_text(p.read_text().replace("intl: ^0.18.1", "intl: ^0.20.3"))
+          PY
 
       - name: Install dependencies
         working-directory: source
