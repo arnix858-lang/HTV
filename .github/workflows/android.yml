@@ -24,7 +24,7 @@ jobs:
       - name: Fix intl constraint for current Flutter SDK
         working-directory: source
         run: |
-          sed -i 's/intl: \\^0\\.18\\.1/intl: ^0.20.3/' pubspec.yaml
+          sed -i '/^  intl:/c\\  intl: ^0.20.3' pubspec.yaml
 
       - name: Install dependencies
         working-directory: source
