@@ -9,7 +9,7 @@ def patch(path, old, new, label):
 p=Path("pubspec.yaml")
 s=p.read_text()
 if "  marquee:" not in s:
-    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0\n  webview_flutter: ^4.8.0")
+    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0\n  video_player: ^2.9.2")
 if "  webview_flutter:" not in s:
     s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  webview_flutter: ^4.8.0")
 p.write_text(s)
@@ -195,7 +195,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:video_player/video_player.dart';
 
 const String tmdbKey = String.fromEnvironment('TMDB_API_KEY', defaultValue: 'de83af9bf3f4cf2d61cb8a9467045768');
 const String tmdbProxyBase = String.fromEnvironment('TMDB_PROXY_URL', defaultValue: '');
@@ -549,157 +549,137 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
 }
 
 class VideoSourcesPage extends StatefulWidget {
-  final String title;
-  final String originalTitle;
-  final String year;
-  final String mediaType;
+  final String title, originalTitle, year, mediaType;
   const VideoSourcesPage({super.key, required this.title, required this.originalTitle, required this.year, required this.mediaType});
   @override
   State<VideoSourcesPage> createState() => _VideoSourcesPageState();
 }
-
 class _VideoSourcesPageState extends State<VideoSourcesPage> {
-  List<Map<String, dynamic>> results = [];
+  List<Map<String,dynamic>> translations = [];
   bool loading = false;
   String? error;
-
+  static const base = 'https://hdrezka.ag';
+  static const ua = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36';
   @override
   void initState() { super.initState(); _search(); }
-
-  String _normalize(String value) => value.toLowerCase().replaceAll(RegExp(r'[^a-zа-яё0-9]'), '');
-
+  String clean(String s) => s.replaceAll(RegExp(r'<[^>]*>'),' ').replaceAll('&nbsp;',' ').replaceAll('&amp;','&').replaceAll('&quot;','"').replaceAll(RegExp(r'\s+'),' ').trim();
+  String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-zа-яё0-9]'),'');
   Future<void> _search() async {
-    setState(() { loading = true; error = null; results = []; });
+    setState(() { loading=true; error=null; translations=[]; });
     try {
-      final uri = Uri.https('hdrezka.ag', '/engine/ajax/search.php', {'q': widget.title});
-      final response = await http.get(uri, headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'text/html,*/*',
-      }).timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200) {
-        throw Exception('HDRezka HTTP ' + response.statusCode.toString() + '. Возможно, сайт временно недоступен.');
-      }
-
-      final found = <Map<String, dynamic>>[];
-      final pattern = RegExp(r'''<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)</a>''', caseSensitive: false);
-      final titleNeedle = _normalize(widget.title);
-      final originalNeedle = _normalize(widget.originalTitle);
-      for (final match in pattern.allMatches(response.body)) {
-        final link = (match.group(1) ?? '').trim();
-        final name = (match.group(2) ?? '')
-            .replaceAll(RegExp(r'<[^>]*>'), ' ')
-            .replaceAll('&nbsp;', ' ')
-            .replaceAll('&amp;', '&')
-            .trim();
-        if (!link.startsWith('http') || name.isEmpty) continue;
-        final normalizedName = _normalize(name);
-        final titleMatch = (titleNeedle.isNotEmpty &&
-                (normalizedName.contains(titleNeedle) || titleNeedle.contains(normalizedName))) ||
-            (originalNeedle.isNotEmpty &&
-                (normalizedName.contains(originalNeedle) || originalNeedle.contains(normalizedName)));
-        if (titleMatch) {
-          found.add({
-            'translation': {'title': 'HDRezka'},
-            'quality': name,
-            'link': link,
-            'provider': 'HDRezka',
-          });
+      final r=await http.get(Uri.parse(base+'/engine/ajax/search.php?q='+Uri.encodeQueryComponent(widget.title)),headers:{'User-Agent':ua,'Accept':'text/html,*/*'}).timeout(const Duration(seconds:20));
+      if(r.statusCode!=200) throw Exception('HDRezka HTTP '+r.statusCode.toString());
+      final found=<Map<String,dynamic>>[];
+      final a=RegExp(r'''<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)</a>''',caseSensitive:false);
+      for(final m in a.allMatches(r.body)) {
+        final href=(m.group(1)??'').replaceAll('&amp;','&');
+        final name=clean(m.group(2)??'');
+        final n=norm(name), t=norm(widget.title), o=norm(widget.originalTitle);
+        if(href.isEmpty || name.isEmpty || !(n.contains(t)||t.contains(n)||n.contains(o)||o.contains(n))) continue;
+        final url=href.startsWith('http')?href:base+href;
+        final page=await http.get(Uri.parse(url),headers:{'User-Agent':ua,'Referer':base+'/'}).timeout(const Duration(seconds:20));
+        if(page.statusCode!=200) continue;
+        final html=page.body;
+        final idMatch=RegExp(r'''id=["']post_id["'][^>]*value=["'](\d+)''',caseSensitive:false).firstMatch(html)
+          ?? RegExp(r'''value=["'](\d+)["'][^>]*id=["']post_id["']''',caseSensitive:false).firstMatch(html)
+          ?? RegExp(r'''(?:post_id|initCDNSeriesEvents|initCDNMoviesEvents)\s*[:=(]\s*["']?(\d+)''',caseSensitive:false).firstMatch(html);
+        if(idMatch==null) continue;
+        final trs=RegExp(r'''data-translator_id=["'](\d+)["'][^>]*>([\s\S]*?)</li>''',caseSensitive:false);
+        for(final tr in trs.allMatches(html)) {
+          final tid=tr.group(1)??'', label=clean(tr.group(2)??'');
+          if(tid.isEmpty || found.any((x)=>x['translatorId']==tid && x['id']==idMatch.group(1))) continue;
+          found.add({'id':idMatch.group(1),'translatorId':tid,'name':label.isEmpty?'Озвучка '+tid:label,'pageUrl':url});
         }
       }
-
-      final seen = <String>{};
-      final unique = found.where((item) => seen.add((item['link'] ?? '').toString())).toList();
-      if (!mounted) return;
-      setState(() {
-        results = unique;
-        loading = false;
-        if (unique.isEmpty) {
-          error = 'На HDRezka ничего не найдено. Проверьте название или попробуйте позже.';
-        }
-      });
-    } catch (e) {
-      if (mounted) setState(() { loading = false; error = e.toString(); });
+      if(!mounted)return;
+      setState(() { translations=found; loading=false; if(found.isEmpty) error='Не удалось получить список озвучек. Возможно, HDRezka заблокировала запрос или изменила разметку.'; });
+    } catch(e) { if(mounted)setState((){loading=false;error=e.toString();}); }
+  }
+  Future<Map<String,dynamic>> api(Map<String,dynamic> item,String action,{int season=1,int episode=1}) async {
+    final body=<String,String>{'id':item['id'].toString(),'translator_id':item['translatorId'].toString(),'action':action};
+    if(action=='get_stream'){body['season']='$season';body['episode']='$episode';}
+    final r=await http.post(Uri.parse(base+'/ajax/get_cdn_series/'),headers:{
+      'User-Agent':ua,'Referer':item['pageUrl'],'Origin':base,'X-Requested-With':'XMLHttpRequest',
+      'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','Accept':'application/json, */*'
+    },body:body).timeout(const Duration(seconds:25));
+    if(r.statusCode!=200)throw Exception('HDRezka API HTTP '+r.statusCode.toString());
+    final d=jsonDecode(r.body);
+    if(d is! Map<String,dynamic>)throw Exception('Некорректный ответ HDRezka');
+    return d;
+  }
+  String decode(String raw) {
+    var v=raw.trim(); if(v.startsWith('[')||v.startsWith('http'))return v;
+    v=v.replaceAll('#h','');
+    const salts=['IyMjI14hISMjIUBA','QEBAQEAhIyMhXl5e','JCQhIUAkJEBeIUAjJCRA','JCQjISFAIyFAIyM=','Xl5eIUAjIyEhIyM='];
+    for(var i=0;i<12&&v.contains('//_//');i++){
+      final p=v.indexOf('//_//'), tail=v.substring(p+5);
+      final salt=salts.where((x)=>tail.startsWith(x)).firstOrNull;
+      v=v.substring(0,p)+(salt==null?(tail.length>16?tail.substring(16):''):tail.substring(salt.length));
     }
+    try{return utf8.decode(base64.decode(base64.normalize(v)));}catch(_){return v;}
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final isTv = MediaQuery.of(context).size.width >= 900;
-    return Scaffold(
-      backgroundColor: const Color(0xFF080A0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF10131A),
-        foregroundColor: Colors.white,
-        title: const Text('HDRezka'),
-        actions: [IconButton(
-          tooltip: 'Повторить поиск',
-          onPressed: loading ? null : _search,
-          icon: const Icon(Icons.refresh),
-        )],
-      ),
-      body: Center(child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820),
-        child: ListView(padding: EdgeInsets.all(isTv ? 28 : 18), children: [
-          Text(widget.title, style: TextStyle(color: Colors.white, fontSize: isTv ? 28 : 21, fontWeight: FontWeight.bold)),
-          if (widget.year.isNotEmpty)
-            Padding(padding: const EdgeInsets.only(top: 6), child: Text(widget.year, style: const TextStyle(color: Colors.white60))),
-          const SizedBox(height: 18),
-          const Text('Поиск видео на HDRezka по названию', style: TextStyle(color: Colors.white54, fontSize: 13)),
-          const SizedBox(height: 16),
-          if (loading)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: Color(0xFFE65A32)))),
-          if (error != null && !loading)
-            Padding(padding: const EdgeInsets.all(12), child: Text(error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.orangeAccent))),
-          ...results.map((item) {
-            final name = (item['translation'] as Map)['title'].toString();
-            final quality = (item['quality'] ?? 'Результат HDRezka').toString();
-            final link = (item['link'] ?? '').toString();
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(color: const Color(0xFF171B24), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white10)),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                leading: const CircleAvatar(backgroundColor: Color(0xFF303746), child: Icon(Icons.movie, color: Colors.white)),
-                title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                subtitle: Text(quality, style: const TextStyle(color: Colors.white60)),
-                trailing: const Icon(Icons.play_circle_fill, color: Color(0xFFE65A32), size: 30),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => KodikPlayerPage(title: widget.title, url: link),
-                )),
-              ),
-            );
-          }),
-        ]),
-      )),
-    );
+  List<String> links(String raw) {
+    final decoded=decode(raw);
+    final found=RegExp(r'\[(?:\d{3,4}p|auto)\](https?://[^\s,]+)',caseSensitive:false).allMatches(decoded).map((m)=>m.group(1)!).toList();
+    if(found.isNotEmpty)return found;
+    return RegExp(r'https?://[^\s,]+').allMatches(decoded).map((m)=>m.group(0)!).toList();
   }
-}
-
-class KodikPlayerPage extends StatefulWidget {
-  final String title;
-  final String url;
-  const KodikPlayerPage({super.key, required this.title, required this.url});
-  @override
-  State<KodikPlayerPage> createState() => _KodikPlayerPageState();
-}
-
-class _KodikPlayerPageState extends State<KodikPlayerPage> {
-  late final WebViewController controller;
-  @override
-  void initState() {
-    super.initState();
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(onWebResourceError: (error) {}))
-      ..loadRequest(Uri.parse(widget.url));
+  Future<void> choose(Map<String,dynamic> item) async {
+    try {
+      final d=await api(item,widget.mediaType=='tv'?'get_episodes':'get_movie');
+      final raw=(d['url']??'').toString();
+      final urls=links(raw);
+      if(urls.isNotEmpty) {
+        if(!mounted)return;
+        Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>CustomStreamPlayer(title:widget.title,streamUrl:urls.first)));
+        return;
+      }
+      final episodes=<Map<String,int>>[];
+      final html=(d['seasons']??d['episodes']??'').toString();
+      final ep=RegExp(r'''data-season=["'](\d+)["'][\s\S]*?data-episode=["'](\d+)["']''');
+      for(final m in ep.allMatches(html)){episodes.add({'season':int.parse(m.group(1)!),'episode':int.parse(m.group(2)!)});}
+      if(episodes.isEmpty)throw Exception('Не удалось получить серии/поток для этой озвучки.');
+      if(!mounted)return;
+      Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>EpisodePickerPage(title:widget.title,episodes:episodes,onPlay:(season,episode)async{
+        final stream=await api(item,'get_stream',season:season,episode:episode);
+        final found=links((stream['url']??'').toString());
+        if(found.isEmpty)throw Exception('Ссылка на серию не найдена');
+        return found.first;
+      })));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}
   }
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.black,
-    appBar: AppBar(backgroundColor: const Color(0xFF10131A), foregroundColor: Colors.white, title: Text(widget.title)),
-    body: WebViewWidget(controller: controller),
-  );
+  Widget build(BuildContext context)=>Scaffold(backgroundColor:const Color(0xFF080A0F),appBar:AppBar(backgroundColor:const Color(0xFF10131A),foregroundColor:Colors.white,title:Text('Озвучки • '+widget.title),actions:[IconButton(onPressed:loading?null:_search,icon:const Icon(Icons.refresh))]),body:ListView(padding:const EdgeInsets.all(16),children:[
+    Text(widget.title,style:const TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.bold)),
+    if(widget.year.isNotEmpty)Text(widget.year,style:const TextStyle(color:Colors.white60)),
+    if(loading)const Center(child:CircularProgressIndicator(color:Color(0xFFE65A32))),
+    if(error!=null&&!loading)Text(error!,style:const TextStyle(color:Colors.orangeAccent)),
+    ...translations.map((x)=>Card(color:const Color(0xFF171B24),child:ListTile(leading:const Icon(Icons.record_voice_over,color:Colors.white),title:Text(x['name'].toString(),style:const TextStyle(color:Colors.white)),subtitle:const Text('Прямой поток • HDRezka',style:TextStyle(color:Colors.white54)),trailing:const Icon(Icons.play_circle_fill,color:Color(0xFFE65A32)),onTap:()=>choose(x))))
+  ]));
 }
+class EpisodePickerPage extends StatelessWidget {
+  final String title; final List<Map<String,int>> episodes; final Future<String> Function(int,int) onPlay;
+  const EpisodePickerPage({super.key,required this.title,required this.episodes,required this.onPlay});
+  @override
+  Widget build(BuildContext context)=>Scaffold(backgroundColor:const Color(0xFF080A0F),appBar:AppBar(backgroundColor:const Color(0xFF10131A),foregroundColor:Colors.white,title:Text(title)),body:ListView(children:episodes.map((e)=>ListTile(leading:const Icon(Icons.play_circle_outline,color:Color(0xFFE65A32)),title:Text('Сезон '+e['season'].toString()+' • Серия '+e['episode'].toString(),style:const TextStyle(color:Colors.white)),onTap:()async{try{final url=await onPlay(e['season']!,e['episode']!);if(!context.mounted)return;Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>CustomStreamPlayer(title:title,streamUrl:url)));}catch(err){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(err.toString())));}})).toList()));
+}
+class CustomStreamPlayer extends StatefulWidget {
+  final String title,streamUrl;
+  const CustomStreamPlayer({super.key,required this.title,required this.streamUrl});
+  @override
+  State<CustomStreamPlayer> createState()=>_CustomStreamPlayerState();
+}
+class _CustomStreamPlayerState extends State<CustomStreamPlayer>{
+  VideoPlayerController? player; String? error;
+  @override
+  void initState(){super.initState();_start();}
+  Future<void> _start()async{try{final c=VideoPlayerController.networkUrl(Uri.parse(widget.streamUrl),httpHeaders:{'User-Agent':'Mozilla/5.0','Referer':'https://hdrezka.ag/'});player=c;await c.initialize();if(!mounted)return;setState((){});await c.play();}catch(e){if(mounted)setState(()=>error=e.toString());}}
+  @override
+  void dispose(){player?.dispose();super.dispose();}
+  @override
+  Widget build(BuildContext context){final p=player;return Scaffold(backgroundColor:Colors.black,appBar:AppBar(backgroundColor:Colors.black,foregroundColor:Colors.white,title:Text(widget.title)),body:Center(child:error!=null?Padding(padding:const EdgeInsets.all(20),child:Text('Ошибка запуска потока: '+error!,style:const TextStyle(color:Colors.white70))):p==null||!p.value.isInitialized?const CircularProgressIndicator(color:Color(0xFFE65A32)):AspectRatio(aspectRatio:p.value.aspectRatio,child:Stack(alignment:Alignment.bottomCenter,children:[VideoPlayer(p),VideoProgressIndicator(p,allowScrubbing:true,colors:const VideoProgressColors(playedColor:Color(0xFFE65A32),bufferedColor:Colors.white38,backgroundColor:Colors.white12)),Positioned(right:10,bottom:20,child:IconButton(icon:Icon(p.value.isPlaying?Icons.pause_circle:Icons.play_circle,color:Colors.white,size:42),onPressed:()=>setState(()=>p.value.isPlaying?p.pause():p.play())))]))));}
+}
+
 """
 
 home_page = r"""import 'package:flutter/material.dart';
