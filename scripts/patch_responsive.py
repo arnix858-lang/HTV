@@ -539,7 +539,11 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
     decoration: BoxDecoration(color: Colors.white.withOpacity(.09), borderRadius: BorderRadius.circular(20.r)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(icon, color: Colors.white70, size: 15.sp), SizedBox(width: 6.w),
-      Text(text, style: TextStyle(color: Colors.white, fontSi
+      Text(text, style: TextStyle(color: Colors.white, fontSize: 13.sp)),
+    ]),
+  );
+
+}
 
 class VideoSourcesPage extends StatefulWidget {
   final String title;
@@ -569,48 +573,90 @@ class _VideoSourcesPageState extends State<VideoSourcesPage> {
     if (!mounted) return;
     tokenController.text = token;
     savedToken = token;
-    if (token.isNotEmpty) _search();
+    _search();
   }
 
   String _normalize(String value) => value.toLowerCase().replaceAll(RegExp(r'[^a-zа-яё0-9]'), '');
 
-  Future<void> _search() async {
-    final token = tokenController.text.trim();
-    if (token.isEmpty) {
-      setState(() { error = 'Введите API-токен Kodik. Его можно получить у поставщика API.'; results = []; });
-      return;
+  Future<List<Map<String, dynamic>>> _searchHtmlSource(String provider, Uri uri) async {
+    final response = await http.get(uri, headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'Accept': 'text/html,*/*',
+    }).timeout(const Duration(seconds: 18));
+    if (response.statusCode != 200) throw Exception(provider + ' HTTP ' + response.statusCode.toString());
+    final found = <Map<String, dynamic>>[];
+    final pattern = RegExp(r'''<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)</a>''', caseSensitive: false);
+    for (final match in pattern.allMatches(response.body)) {
+      final link = (match.group(1) ?? '').trim();
+      final name = (match.group(2) ?? '').replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll('&nbsp;', ' ').trim();
+      if (!link.startsWith('http') || name.isEmpty) continue;
+      final n = _normalize(name), ru = _normalize(widget.title), original = _normalize(widget.originalTitle);
+      if (n.contains(ru) || ru.contains(n) || (original.isNotEmpty && (n.contains(original) || original.contains(n)))) {
+        found.add({
+          'translation': {'title': provider},
+          'quality': name,
+          'link': link,
+          'provider': provider,
+        });
+      }
     }
+    return found;
+  }
+
+  Future<void> _search() async {
     setState(() { loading = true; error = null; results = []; });
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('kodik_api_token', token);
-      final uri = Uri.https('kodik-api.com', '/search', {'token': token, 'title': widget.title, 'limit': '50'});
-      final response = await http.post(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200) throw Exception('Kodik API: HTTP ${response.statusCode}');
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final raw = (data['results'] as List? ?? const []);
-      final titleNeedle = _normalize(widget.title);
-      final originalNeedle = _normalize(widget.originalTitle);
-      final yearNeedle = int.tryParse(widget.year);
-      final matched = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).where((item) {
-        final title = _normalize((item['title'] ?? '').toString());
-        final original = _normalize((item['title_orig'] ?? '').toString());
-        final other = _normalize((item['other_title'] ?? '').toString());
-        final titleMatch = title == titleNeedle || original == titleNeedle ||
-            (originalNeedle.isNotEmpty && (title == originalNeedle || original == originalNeedle || other.contains(originalNeedle)));
-        final itemYear = int.tryParse((item['year'] ?? '').toString());
-        final yearMatch = yearNeedle == null || itemYear == null || (itemYear - yearNeedle).abs() <= 1;
-        return titleMatch && yearMatch && (item['link'] ?? '').toString().isNotEmpty;
-      }).toList();
+      final token = tokenController.text.trim();
+      if (token.isNotEmpty) await prefs.setString('kodik_api_token', token);
+      final all = <Map<String, dynamic>>[];
+
+      if (token.isNotEmpty) {
+        final uri = Uri.https('kodik-api.com', '/search', {
+          'token': token, 'title': widget.title, 'limit': '50',
+        });
+        final response = await http.post(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 20));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final raw = data['results'] as List? ?? const [];
+          final titleNeedle = _normalize(widget.title);
+          final originalNeedle = _normalize(widget.originalTitle);
+          final yearNeedle = int.tryParse(widget.year);
+          final matched = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).where((item) {
+            final title = _normalize((item['title'] ?? '').toString());
+            final original = _normalize((item['title_orig'] ?? '').toString());
+            final other = _normalize((item['other_title'] ?? '').toString());
+            final titleMatch = title == titleNeedle || original == titleNeedle ||
+              (originalNeedle.isNotEmpty && (title == originalNeedle || original == originalNeedle || other.contains(originalNeedle)));
+            final itemYear = int.tryParse((item['year'] ?? '').toString());
+            final yearMatch = yearNeedle == null || itemYear == null || (itemYear - yearNeedle).abs() <= 1;
+            return titleMatch && yearMatch && (item['link'] ?? '').toString().isNotEmpty;
+          }).toList();
+          all.addAll(matched);
+        } else {
+          throw Exception('Kodik API HTTP ' + response.statusCode.toString());
+        }
+      }
+
+      final sources = await Future.wait([
+        _searchHtmlSource('HDRezka', Uri.https('hdrezka.ag', '/engine/ajax/search.php', {'q': widget.title})),
+        _searchHtmlSource('Filmix', Uri.https('filmix.my', '/search/', {'do': 'search', 'subaction': 'search', 'q': widget.title})),
+      ]);
+      for (final sourceResults in sources) { all.addAll(sourceResults); }
+
       final seen = <String>{};
-      final unique = matched.where((item) {
-        final translation = item['translation'] is Map ? item['translation'] as Map : const {};
-        final name = (translation['title'] ?? 'Оригинал').toString();
+      final unique = all.where((item) {
+        final tr = item['translation'] is Map ? item['translation'] as Map : const {};
+        final name = (tr['title'] ?? item['provider'] ?? 'Оригинал').toString();
         final quality = (item['quality'] ?? '').toString();
-        return seen.add('$name|$quality|${item['link']}');
+        return seen.add(name + '|' + quality + '|' + (item['link'] ?? '').toString());
       }).toList();
       if (!mounted) return;
-      setState(() { results = unique; loading = false; if (unique.isEmpty) error = 'Подходящие озвучки не найдены. Попробуйте оригинальное название или проверьте токен.'; });
+      setState(() {
+        results = unique;
+        loading = false;
+        if (unique.isEmpty) error = 'Ничего не найдено. Kodik требует личный API-токен; HDRezka и Filmix ищутся по названию.';
+      });
     } catch (e) {
       if (mounted) setState(() { loading = false; error = e.toString(); });
     }
