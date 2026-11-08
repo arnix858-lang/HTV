@@ -475,7 +475,7 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
             final posterWidth = (screenWidth * (compact ? 0.32 : isTv ? 0.25 : 0.23)).clamp(100.0, isTv ? 340.0 : 260.0);
             final posterHeight = (constraints.maxHeight * (compact ? 0.48 : 0.78)).clamp(150.0, 430.0);
             return Padding(
-              padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 10, compact ? 16 : 42, 22),
+              padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 10, compact ? 16 : 42, isTv ? 110 : 92),
               child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 if (poster.isNotEmpty)
                   ClipRRect(
@@ -534,23 +534,7 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withOpacity(.82), fontSize: compact ? 13 : 17, height: 1.45)),
                     SizedBox(height: compact ? 12 : 18),
-                    if (isTv)
-                      FocusTraversalGroup(
-                        policy: OrderedTraversalPolicy(),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FocusTraversalOrder(order: const NumericFocusOrder(1), child: favoriteButton),
-                            const SizedBox(width: 22),
-                            FocusTraversalOrder(order: const NumericFocusOrder(2), child: watchButton),
-                          ],
-                        ),
-                      )
-                    else
-                      Wrap(spacing: 10, runSpacing: 10, children: [
-                        favoriteButton,
-                        watchButton,
-                      ]),
+                    const SizedBox(height: 4),
                     if (loading) const Padding(padding: EdgeInsets.only(top: 12),
                       child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
                     if (error != null) Padding(padding: const EdgeInsets.only(top: 8),
@@ -562,6 +546,28 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
             );
           })),
         ])),
+        Positioned(
+          left: isTv ? 42 : 16,
+          right: isTv ? 42 : 16,
+          bottom: isTv ? 28 : 12,
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: FocusTraversalGroup(
+                policy: OrderedTraversalPolicy(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FocusTraversalOrder(order: const NumericFocusOrder(1), child: favoriteButton),
+                    SizedBox(width: isTv ? 24 : 12),
+                    FocusTraversalOrder(order: const NumericFocusOrder(2), child: watchButton),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ]),
     );
   }
