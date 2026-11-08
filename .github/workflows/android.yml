@@ -498,7 +498,7 @@ jobs:
           s = s.replace("gradle-8.5-all.zip", "gradle-8.5-bin.zip")
           lines = [line for line in s.splitlines() if not line.startswith("networkTimeout=")]
           lines.append("networkTimeout=180000")
-          p.write_text("\\n".join(lines) + "\\n")
+          p.write_text("\n".join(lines) + "\n")
           print(p.read_text())
           PY
 
