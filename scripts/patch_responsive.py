@@ -9,7 +9,7 @@ def patch(path, old, new, label):
 p=Path("pubspec.yaml")
 s=p.read_text()
 if "  marquee:" not in s:
-    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0\n  shared_preferences: ^2.3.2")
+    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0")
 p.write_text(s)
 
 p=Path("lib/pages/settings/widgets/settings.dart")
