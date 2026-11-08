@@ -361,10 +361,13 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
   }
 
   void _watch() {
-    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Просмотр'),
-      content: const Text('Для запуска фильма или серии необходимо подключить источник видеопотока. TMDB предоставляет каталог и описания, но не сами видео.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Понятно'))],
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => VideoSourcesPage(
+        title: _title,
+        originalTitle: (details?['original_title'] ?? details?['original_name'] ?? widget.item['original_title'] ?? widget.item['original_name'] ?? _title).toString(),
+        year: _date.length >= 4 ? _date.substring(0, 4) : '',
+        mediaType: widget.mediaType,
+      ),
     ));
   }
 
@@ -534,7 +537,66 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
     decoration: BoxDecoration(color: Colors.white.withOpacity(.09), borderRadius: BorderRadius.circular(20.r)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(icon, color: Colors.white70, size: 15.sp), SizedBox(width: 6.w),
-      Text(text, style: TextStyle(color: Colors.white, fontSize: 14.sp)),
+      Text(text, style: TextStyle(color: Colors.white, fontSi
+
+class VideoSourcesPage extends StatefulWidget {
+  final String title;
+  final String originalTitle;
+  final String year;
+  final String mediaType;
+  const VideoSourcesPage({super.key, required this.title, required this.originalTitle, required this.year, required this.mediaType});
+  @override
+  State<VideoSourcesPage> createState() => _VideoSourcesPageState();
+}
+
+class _VideoSourcesPageState extends State<VideoSourcesPage> {
+  final List<Map<String, String>> sources = const [
+    {'name': 'HDRezka', 'description': 'Фильмы и сериалы'},
+    {'name': 'Filmix', 'description': 'Фильмы и сериалы'},
+    {'name': 'Kodik', 'description': 'Плееры и озвучки'},
+    {'name': 'Collaps', 'description': 'Фильмы и сериалы'},
+    {'name': 'HDVB', 'description': 'Видеоисточники'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isTv = MediaQuery.of(context).size.width >= 900;
+    return Scaffold(
+      backgroundColor: const Color(0xFF080A0F),
+      appBar: AppBar(backgroundColor: const Color(0xFF10131A), foregroundColor: Colors.white, title: const Text('Выберите озвучку')),
+      body: Center(child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: ListView(padding: EdgeInsets.all(isTv ? 28 : 18), children: [
+          Text(widget.title, style: TextStyle(color: Colors.white, fontSize: isTv ? 28 : 21, fontWeight: FontWeight.bold)),
+          if (widget.year.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(widget.year, style: const TextStyle(color: Colors.white60))),
+          const SizedBox(height: 22),
+          const Icon(Icons.video_library_outlined, size: 54, color: Colors.white38),
+          const SizedBox(height: 14),
+          const Text('Источники ещё не подключены', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          const Text('Для отображения реальных озвучек нужно подключить рабочие адаптеры сайтов. Сейчас HTV не получает от них ссылки на видео.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, height: 1.5)),
+          const SizedBox(height: 24),
+          ...sources.map((source) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFF171B24), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white10)),
+            child: Row(children: [
+              const Icon(Icons.cloud_off_outlined, color: Colors.white38, size: 25),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(source['name']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                const SizedBox(height: 3),
+                Text(source['description']!, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+              ])),
+              const Text('Не подключён', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+            ]),
+          )),
+        ]),
+      )),
+    );
+  }
+}
+ze: 14.sp)),
     ]),
   );
 }
