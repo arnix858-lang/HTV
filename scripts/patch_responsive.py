@@ -400,6 +400,36 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
     final status = (details?['status'] ?? '').toString();
     final countryList = (details?['production_countries'] as List? ?? const []).map((x) => (x['name'] ?? '').toString()).where((x) => x.isNotEmpty).take(2).join(', ');
     final cast = (details?['credits']?['cast'] as List? ?? const []).take(3).map((x) => (x['name'] ?? '').toString()).where((x) => x.isNotEmpty).join(' • ');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTv = screenWidth >= 900;
+    final compact = screenWidth < 600;
+
+    final favoriteButton = OutlinedButton.icon(
+      autofocus: isTv,
+      onPressed: _toggleFavorite,
+      icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border,
+        color: isFavorite ? Colors.pinkAccent : Colors.white, size: isTv ? 27 : 21),
+      label: Text(isFavorite ? 'В избранном' : 'В избранное',
+        style: TextStyle(color: Colors.white, fontSize: isTv ? 20 : 15, fontWeight: FontWeight.w600)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size(isTv ? 250 : 0, isTv ? 64 : 52),
+        padding: EdgeInsets.symmetric(horizontal: isTv ? 28 : 16, vertical: isTv ? 18 : 14),
+        side: const BorderSide(color: Colors.white70, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+    final watchButton = FilledButton.icon(
+      onPressed: _watch,
+      icon: Icon(Icons.play_arrow_rounded, color: Colors.white, size: isTv ? 30 : 22),
+      label: Text('Смотреть', style: TextStyle(color: Colors.white,
+        fontSize: isTv ? 21 : 16, fontWeight: FontWeight.bold)),
+      style: FilledButton.styleFrom(
+        minimumSize: Size(isTv ? 230 : 0, isTv ? 64 : 52),
+        padding: EdgeInsets.symmetric(horizontal: isTv ? 32 : 18, vertical: isTv ? 18 : 14),
+        backgroundColor: const Color(0xFFE65A32),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF080A0F),
@@ -442,9 +472,7 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
             ]),
           ),
           Expanded(child: LayoutBuilder(builder: (context, constraints) {
-            final screenWidth = MediaQuery.of(context).size.width;
-            final compact = screenWidth < 600;
-            final posterWidth = (screenWidth * (compact ? 0.32 : 0.23)).clamp(100.0, 260.0);
+            final posterWidth = (screenWidth * (compact ? 0.32 : isTv ? 0.25 : 0.23)).clamp(100.0, isTv ? 340.0 : 260.0);
             final posterHeight = (constraints.maxHeight * (compact ? 0.48 : 0.78)).clamp(150.0, 430.0);
             return Padding(
               padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 10, compact ? 16 : 42, 22),
@@ -506,20 +534,23 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withOpacity(.82), fontSize: compact ? 13 : 17, height: 1.45)),
                     SizedBox(height: compact ? 12 : 18),
-                    Wrap(spacing: 9, runSpacing: 8, children: [
-                      OutlinedButton.icon(
-                        onPressed: _toggleFavorite,
-                        icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? Colors.pinkAccent : Colors.white),
-                        label: Text(isFavorite ? 'В избранном' : 'В избранное', style: const TextStyle(color: Colors.white)),
-                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white38), padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: compact ? 8 : 12)),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _watch,
-                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
-                        label: const Text('Смотреть', style: TextStyle(color: Colors.white)),
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE65A32), padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 20, vertical: compact ? 9 : 13)),
-                      ),
-                    ]),
+                    if (isTv)
+                      FocusTraversalGroup(
+                        policy: OrderedTraversalPolicy(),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FocusTraversalOrder(order: const NumericFocusOrder(1), child: favoriteButton),
+                            const SizedBox(width: 22),
+                            FocusTraversalOrder(order: const NumericFocusOrder(2), child: watchButton),
+                          ],
+                        ),
+                      )
+                    else
+                      Wrap(spacing: 10, runSpacing: 10, children: [
+                        favoriteButton,
+                        watchButton,
+                      ]),
                     if (loading) const Padding(padding: EdgeInsets.only(top: 12),
                       child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
                     if (error != null) Padding(padding: const EdgeInsets.only(top: 8),
