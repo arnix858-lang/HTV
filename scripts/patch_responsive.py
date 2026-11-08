@@ -16,6 +16,8 @@ p=Path("lib/pages/settings/widgets/settings.dart")
 s=p.read_text()
 if "package:marquee/marquee.dart" not in s:
     s=s.replace("import 'package:flutter/material.dart';", "import 'package:flutter/material.dart';\nimport 'package:marquee/marquee.dart';\nimport 'package:font_awesome_flutter/font_awesome_flutter.dart';")
+if "package_info_plus/package_info_plus.dart" not in s:
+    s=s.replace("import 'package:flutter/material.dart';", "import 'package:flutter/material.dart';\nimport 'package:package_info_plus/package_info_plus.dart';")
 # Add a reusable overflow-aware marquee widget before SettingsMain.
 anchor="class SettingsMain extends StatefulWidget {"
 widget="""class _SettingMarqueeText extends StatelessWidget {
@@ -111,7 +113,54 @@ new="""          Row(
           ),"""
 if old not in s: raise SystemExit("Settings header row pattern missing")
 s=s.replace(old,new,1)
-# Keep the description separated by spacing only; no visible divider line.
+# Add a localized About dialog with the actual installed app version.
+about_method = """  Future<void> _showAboutApp() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('О приложении'),
+        content: SingleChildScrollView(
+          child: Text(
+            'HTV — приложение для просмотра телеканалов, фильмов, сериалов, мультфильмов и другого видеоконтента.\\n\\n'
+            'Приложение предоставляется абсолютно бесплатно. Оплата и подписка не требуются.\\n\\n'
+            'Версия: ${info.version} (${info.buildNumber})',
+            style: AppTheme.text(AppTheme.fg(context), 18.sp),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
+"""
+method_anchor = "  void _showServerQrcode() {"
+if method_anchor not in s:
+    raise SystemExit("About dialog insertion point missing")
+s = s.replace(method_anchor, about_method + method_anchor, 1)
+
+more_old = """      SettingGroup(name: '更多', items: [
+        SettingItem(
+          title: '更多设置',"""
+more_new = """      SettingGroup(name: '更多', items: [
+        SettingItem(
+          title: 'О приложении',
+          value: () => 'Бесплатно',
+          description: () => 'Назначение приложения и текущая версия',
+          onTap: () => _showAboutApp(),
+        ),
+        SettingItem(
+          title: '更多设置',"""
+if more_old not in s:
+    raise SystemExit("About setting item insertion point missing")
+s = s.replace(more_old, more_new, 1)
+
 p.write_text(s)
 
 # Insert icon mapping before _buildSettingItem.
