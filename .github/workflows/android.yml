@@ -490,15 +490,15 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           p = Path("android/gradle/wrapper/gradle-wrapper.properties")
-          s = p.read_text()
-          s = s.replace(
-              "https\\://services.gradle.org/distributions/gradle-8.5-all.zip",
-              "https\\://downloads.gradle.org/distributions/gradle-8.5-bin.zip"
-          )
-          s = s.replace("gradle-8.5-all.zip", "gradle-8.5-bin.zip")
-          lines = [line for line in s.splitlines() if not line.startswith("networkTimeout=")]
-          lines.append("networkTimeout=180000")
-          p.write_text("\n".join(lines) + "\n")
+          lines = [
+              "distributionBase=GRADLE_USER_HOME",
+              "distributionPath=wrapper/dists",
+              "distributionUrl=https\\://mirrors.huaweicloud.com/gradle/gradle-8.5-bin.zip",
+              "networkTimeout=600000",
+              "zipStoreBase=GRADLE_USER_HOME",
+              "zipStorePath=wrapper/dists",
+          ]
+          p.write_text("\\n".join(lines) + "\\n")
           print(p.read_text())
           PY
 
