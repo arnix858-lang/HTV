@@ -87,7 +87,7 @@ new="""          Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(_settingIcon(item.title), size: 38.sp, color: textColor),
-              SizedBox(width: 12.w),
+              SizedBox(width: 20.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,6 +98,7 @@ new="""          Row(
                       style: AppTheme.text(textColor, 28.sp),
                       height: 38.sp,
                     ),
+                    SizedBox(height: 5.h),
                     _SettingMarqueeText(
                       text: item.value(),
                       style: AppTheme.text(AppTheme.fgFaded(context, AppTheme.oSecondary), 22.sp),
@@ -110,28 +111,7 @@ new="""          Row(
           ),"""
 if old not in s: raise SystemExit("Settings header row pattern missing")
 s=s.replace(old,new,1)
-# Add a very subtle divider before the description so title/status/description read as separate levels.
-description_old = """          Text(
-            item.description(),
-            style: AppTheme.text(textColor, 24.sp),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          )"""
-description_new = """          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Divider(height: 14.h, thickness: 1, color: textColor.withOpacity(0.08)),
-              Text(
-                item.description(),
-                style: AppTheme.text(textColor, 24.sp),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          )"""
-if description_old in s:
-    s = s.replace(description_old, description_new, 1)
+# Keep the description separated by spacing only; no visible divider line.
 p.write_text(s)
 
 # Insert icon mapping before _buildSettingItem.
