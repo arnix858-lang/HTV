@@ -484,21 +484,22 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Optimize Gradle download
+      - name: Configure reliable Gradle download
         working-directory: source
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path("android/gradle/wrapper/gradle-wrapper.properties")
           s = p.read_text()
+          s = s.replace(
+              "https\\://services.gradle.org/distributions/gradle-8.5-all.zip",
+              "https\\://downloads.gradle.org/distributions/gradle-8.5-bin.zip"
+          )
           s = s.replace("gradle-8.5-all.zip", "gradle-8.5-bin.zip")
-          if "networkTimeout=" not in s:
-              s += "\\nnetworkTimeout=180000\\n"
-          else:
-              import re
-              s = re.sub(r"networkTimeout=\\d+", "networkTimeout=180000", s)
-          p.write_text(s)
-          print(s)
+          lines = [line for line in s.splitlines() if not line.startswith("networkTimeout=")]
+          lines.append("networkTimeout=180000")
+          p.write_text("\\n".join(lines) + "\\n")
+          print(p.read_text())
           PY
 
       - name: Cache Gradle distributions and dependencies
