@@ -313,9 +313,12 @@ class HomePage extends StatelessWidget {
                         style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w700),
                       ),
                       SizedBox(height: 30.h),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+                      SizedBox(
+                        height: 280.h,
+                        width: double.infinity,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                           _menuCard(
                             context: context,
                             icon: Icons.live_tv_rounded,
@@ -340,7 +343,8 @@ class HomePage extends StatelessWidget {
                             accent: const Color(0xFF55B8E8),
                             onTap: () => _openPage(context, const SettingsPage()),
                           ),
-                        ],
+                          ],
+                        ),
                       ),
                       const Spacer(),
                       Text(
