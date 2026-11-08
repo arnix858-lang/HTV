@@ -145,21 +145,18 @@ if method_anchor not in s:
     raise SystemExit("About dialog insertion point missing")
 s = s.replace(method_anchor, about_method + method_anchor, 1)
 
-more_old = """      SettingGroup(name: '更多', items: [
-        SettingItem(
-          title: '更多设置',"""
-more_new = """      SettingGroup(name: '更多', items: [
+more_anchor = "      SettingGroup(name: '更多', items: ["
+more_insert = """      SettingGroup(name: '更多', items: [
         SettingItem(
           title: 'О приложении',
           value: () => 'Бесплатно',
           description: () => 'Назначение приложения и текущая версия',
           onTap: () => _showAboutApp(),
-        ),
-        SettingItem(
-          title: '更多设置',"""
-if more_old not in s:
-    raise SystemExit("About setting item insertion point missing")
-s = s.replace(more_old, more_new, 1)
+        ),"""
+if more_anchor not in s:
+    raise SystemExit("About settings group insertion point missing")
+if "title: 'О приложении'" not in s:
+    s=s.replace(more_anchor, more_insert, 1)
 
 p.write_text(s)
 
