@@ -84,24 +84,26 @@ old="""          Row(
             ],
           ),"""
 new="""          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(_settingIcon(item.title), size: 28.sp, color: textColor),
               SizedBox(width: 12.w),
               Expanded(
-                flex: 5,
-                child: _SettingMarqueeText(
-                  text: item.title,
-                  style: AppTheme.text(textColor, 28.sp),
-                  height: 38.sp,
-                ),
-              ),
-              SizedBox(width: 10.w),
-              Expanded(
-                flex: 4,
-                child: _SettingMarqueeText(
-                  text: item.value(),
-                  style: AppTheme.text(textColor, 26.sp),
-                  height: 38.sp,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SettingMarqueeText(
+                      text: item.title,
+                      style: AppTheme.text(textColor, 28.sp),
+                      height: 38.sp,
+                    ),
+                    _SettingMarqueeText(
+                      text: item.value(),
+                      style: AppTheme.text(AppTheme.fgFaded(context, AppTheme.oSecondary), 22.sp),
+                      height: 30.sp,
+                    ),
+                  ],
                 ),
               ),
             ],
