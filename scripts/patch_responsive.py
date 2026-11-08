@@ -86,7 +86,7 @@ old="""          Row(
 new="""          Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(_settingIcon(item.title), size: 28.sp, color: textColor),
+              Icon(_settingIcon(item.title), size: 38.sp, color: textColor),
               SizedBox(width: 12.w),
               Expanded(
                 child: Column(
@@ -110,6 +110,30 @@ new="""          Row(
           ),"""
 if old not in s: raise SystemExit("Settings header row pattern missing")
 s=s.replace(old,new,1)
+# Add a very subtle divider before the description so title/status/description read as separate levels.
+description_old = """          Text(
+            item.description(),
+            style: AppTheme.text(textColor, 24.sp),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          )"""
+description_new = """          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Divider(height: 14.h, thickness: 1, color: textColor.withOpacity(0.08)),
+              Text(
+                item.description(),
+                style: AppTheme.text(textColor, 24.sp),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          )"""
+if description_old in s:
+    s = s.replace(description_old, description_new, 1)
+p.write_text(s)
+
 # Insert icon mapping before _buildSettingItem.
 anchor="  Widget _buildSettingItem(SettingItem item, bool isSelected) {"
 icons="""  IconData _settingIcon(String title) {
