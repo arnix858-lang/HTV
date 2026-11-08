@@ -248,16 +248,9 @@ class _CinemaPageState extends State<CinemaPage> {
   }
 
   void details(Map item) {
-    final name = (item['title'] ?? item['name'] ?? 'Без названия').toString();
-    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1B1F29),
-      title: Text(name, style: const TextStyle(color: Colors.white)),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (item['poster_path'] != null) Image.network(posterBase + item['poster_path'].toString(), height: 230),
-        Text((item['overview'] ?? 'Описание отсутствует').toString(), style: const TextStyle(color: Colors.white70)),
-        Text('Рейтинг: ' + (item['vote_average'] ?? '—').toString(), style: const TextStyle(color: Colors.white)),
-      ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть'))],
+    final type = (item['media_type'] ?? (section == 'Сериалы' ? 'tv' : 'movie')).toString();
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => CinemaDetailsPage(item: Map<String, dynamic>.from(item), mediaType: type == 'tv' ? 'tv' : 'movie'),
     ));
   }
 
@@ -309,7 +302,7 @@ class _CinemaPageState extends State<CinemaPage> {
               final name = (item['title'] ?? item['name'] ?? 'Без названия').toString();
               return InkWell(onTap: () => details(item), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(12.r), child: Container(width: double.infinity, color: const Color(0xFF1B1F29),
-                  child: poster == null ? const Icon(Icons.movie_outlined, color: Colors.white38, size: 42) : Image.network(posterBase + poster.toString(), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 38)))))),
+                  child: poster == null ? const Icon(Icons.movie_outlined, color: Colors.white38, size: 42) : Image.network('https://image.tmdb.org/t/p/w342' + poster.toString(), fit: BoxFit.cover, cacheWidth: 260, filterQuality: FilterQuality.low, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 38)))))),
                 SizedBox(height: 7.h),
                 Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 15.sp)),
                 Text('★ ' + (item['vote_average'] ?? 0).toString(), style: TextStyle(color: Colors.white60, fontSize: 13.sp)),
@@ -317,6 +310,109 @@ class _CinemaPageState extends State<CinemaPage> {
             })),
       ])),
     ])));
+}
+
+class CinemaDetailsPage extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final String mediaType;
+  const CinemaDetailsPage({super.key, required this.item, required this.mediaType});
+  @override
+  State<CinemaDetailsPage> createState() => _CinemaDetailsPageState();
+}
+
+class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
+  Map<String, dynamic>? details;
+  bool loading = true;
+  String? error;
+
+  @override
+  void initState() { super.initState(); _loadDetails(); }
+
+  Future<void> _loadDetails() async {
+    try {
+      final id = widget.item['id'];
+      final uri = Uri.https('api.themoviedb.org', '/3/' + widget.mediaType + '/' + id.toString(), {
+        'api_key': tmdbKey, 'language': 'ru-RU',
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 18));
+      if (response.statusCode != 200) throw Exception('TMDB HTTP ' + response.statusCode.toString());
+      if (!mounted) return;
+      setState(() { details = jsonDecode(response.body) as Map<String, dynamic>; loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { error = e.toString(); loading = false; });
+    }
+  }
+
+  String get _date => (details?['release_date'] ?? details?['first_air_date'] ?? widget.item['release_date'] ?? widget.item['first_air_date'] ?? '—').toString();
+  String get _title => (details?['title'] ?? details?['name'] ?? widget.item['title'] ?? widget.item['name'] ?? 'Без названия').toString();
+
+  @override
+  Widget build(BuildContext context) {
+    final backdrop = (details?['backdrop_path'] ?? widget.item['backdrop_path'] ?? '').toString();
+    final poster = (details?['poster_path'] ?? widget.item['poster_path'] ?? '').toString();
+    final overview = (details?['overview'] ?? widget.item['overview'] ?? 'Описание пока отсутствует.').toString();
+    final genres = (details?['genres'] as List? ?? const []);
+    final rating = (details?['vote_average'] ?? widget.item['vote_average'] ?? 0).toString();
+    final year = _date.length >= 4 ? _date.substring(0, 4) : _date;
+    final runtime = details?['runtime'] ?? ((details?['episode_run_time'] is List && (details?['episode_run_time'] as List).isNotEmpty) ? (details?['episode_run_time'] as List).first : null);
+
+    return Scaffold(backgroundColor: const Color(0xFF10131A),
+      body: CustomScrollView(slivers: [
+        SliverAppBar(pinned: true, backgroundColor: const Color(0xFF10131A), expandedHeight: 330,
+          leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white), onPressed: () => Navigator.pop(context)),
+          flexibleSpace: FlexibleSpaceBar(background: Stack(fit: StackFit.expand, children: [
+            if (backdrop.isNotEmpty) Image.network('https://image.tmdb.org/t/p/w1280' + backdrop,
+              fit: BoxFit.cover, cacheWidth: 1280, filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              colors: [Color(0x22000000), Color(0xFF10131A)], stops: [0.15, 1.0]))),
+            Align(alignment: Alignment.bottomLeft, child: Padding(padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+              child: Text(_title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)))),
+          ]))),
+        SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(28.w, 8.h, 28.w, 34.h),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (poster.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(14.r),
+              child: Image.network('https://image.tmdb.org/t/p/w342' + poster,
+                width: 180.w, height: 270.h, fit: BoxFit.cover, cacheWidth: 360,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) => Container(width: 180.w, height: 270.h,
+                  color: const Color(0xFF1B1F29), child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 48)))),
+            SizedBox(width: 26.w),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_title, style: TextStyle(color: Colors.white, fontSize: 28.sp, fontWeight: FontWeight.w800)),
+              SizedBox(height: 12.h),
+              Wrap(spacing: 9.w, runSpacing: 8.h, children: [
+                _chip(year, Icons.calendar_today_outlined), _chip('★ ' + rating, Icons.star_outline_rounded),
+                if (runtime != null) _chip(runtime.toString() + ' мин.', Icons.schedule_rounded),
+                if (details?['number_of_seasons'] != null) _chip(details!['number_of_seasons'].toString() + ' сез.', Icons.tv_outlined),
+              ]),
+              SizedBox(height: 18.h),
+              if (genres.isNotEmpty) Wrap(spacing: 8.w, runSpacing: 8.h,
+                children: genres.map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList()),
+              SizedBox(height: 20.h),
+              Text('О фильме', style: TextStyle(color: Colors.white, fontSize: 21.sp, fontWeight: FontWeight.bold)),
+              SizedBox(height: 8.h),
+              Text(overview, style: TextStyle(color: Colors.white70, fontSize: 17.sp, height: 1.5)),
+              if (loading) const Padding(padding: EdgeInsets.only(top: 16),
+                child: LinearProgressIndicator(color: Colors.white24, backgroundColor: Colors.white10)),
+              if (error != null) Padding(padding: const EdgeInsets.only(top: 12),
+                child: Text('Не удалось загрузить дополнительные данные: ' + error!, style: const TextStyle(color: Colors.white54))),
+            ])),
+          ]))),
+      ]));
+  }
+
+  Widget _chip(String text, IconData icon) => Container(
+    padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 8.h),
+    decoration: BoxDecoration(color: Colors.white.withOpacity(.09), borderRadius: BorderRadius.circular(20.r)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, color: Colors.white70, size: 15.sp), SizedBox(width: 6.w),
+      Text(text, style: TextStyle(color: Colors.white, fontSize: 14.sp)),
+    ]),
+  );
 }
 """
 
