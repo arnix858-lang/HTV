@@ -498,7 +498,7 @@ jobs:
               "zipStoreBase=GRADLE_USER_HOME",
               "zipStorePath=wrapper/dists",
           ]
-          p.write_text("\\n".join(lines) + "\\n")
+          p.write_text("\n".join(lines) + "\n")
           print(p.read_text())
           PY
 
