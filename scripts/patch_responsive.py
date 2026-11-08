@@ -145,8 +145,8 @@ if method_anchor not in s:
     raise SystemExit("About dialog insertion point missing")
 s = s.replace(method_anchor, about_method + method_anchor, 1)
 
-more_anchor = "      SettingGroup(name: '更多', items: ["
-more_insert = """      SettingGroup(name: '更多', items: [
+more_anchor = "SettingGroup(name: '更多', items: ["
+more_insert = """SettingGroup(name: '更多', items: [
         SettingItem(
           title: 'О приложении',
           value: () => 'Бесплатно',
