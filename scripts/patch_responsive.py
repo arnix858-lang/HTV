@@ -368,21 +368,24 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
             const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
               colors: [Color(0x22000000), Color(0xFF10131A)], stops: [0.15, 1.0]))),
-            Align(alignment: Alignment.bottomLeft, child: Padding(padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
-              child: Text(_title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)))),
+            const SizedBox.shrink(),
           ]))),
-        SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(28.w, 8.h, 28.w, 34.h),
+        SliverToBoxAdapter(child: LayoutBuilder(builder: (context, constraints) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final posterWidth = (screenWidth * 0.29).clamp(92.0, 220.0);
+          final posterHeight = posterWidth * 1.5;
+          final compact = screenWidth < 600;
+          return Padding(padding: EdgeInsets.fromLTRB(compact ? 14 : 28, 12, compact ? 14 : 28, 34),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (poster.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(14.r),
+            if (poster.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(14),
               child: Image.network('https://image.tmdb.org/t/p/w342' + poster,
-                width: 180.w, height: 270.h, fit: BoxFit.cover, cacheWidth: 360,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, __, ___) => Container(width: 180.w, height: 270.h,
-                  color: const Color(0xFF1B1F29), child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 48)))),
-            SizedBox(width: 26.w),
+                width: posterWidth, height: posterHeight, fit: BoxFit.cover, cacheWidth: 440,
+                filterQuality: FilterQuality.medium, gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => Container(width: posterWidth, height: posterHeight,
+                  color: const Color(0xFF1B1F29), child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 42)))),
+            SizedBox(width: compact ? 14 : 26),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_title, style: TextStyle(color: Colors.white, fontSize: 28.sp, fontWeight: FontWeight.w800)),
+              Text(_title, style: TextStyle(color: Colors.white, fontSize: compact ? 20 : 28, fontWeight: FontWeight.w800)),
               SizedBox(height: 12.h),
               Wrap(spacing: 9.w, runSpacing: 8.h, children: [
                 _chip(year, Icons.calendar_today_outlined), _chip('★ ' + rating, Icons.star_outline_rounded),
@@ -395,13 +398,14 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
               SizedBox(height: 20.h),
               Text('О фильме', style: TextStyle(color: Colors.white, fontSize: 21.sp, fontWeight: FontWeight.bold)),
               SizedBox(height: 8.h),
-              Text(overview, style: TextStyle(color: Colors.white70, fontSize: 17.sp, height: 1.5)),
+              Text(overview, style: TextStyle(color: Colors.white70, fontSize: compact ? 13 : 17, height: 1.5)),
               if (loading) const Padding(padding: EdgeInsets.only(top: 16),
                 child: LinearProgressIndicator(color: Colors.white24, backgroundColor: Colors.white10)),
               if (error != null) Padding(padding: const EdgeInsets.only(top: 12),
                 child: Text('Не удалось загрузить дополнительные данные: ' + error!, style: const TextStyle(color: Colors.white54))),
             ])),
-          ]))),
+          ]));
+        })),
       ]));
   }
 
