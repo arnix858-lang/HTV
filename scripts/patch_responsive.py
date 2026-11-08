@@ -737,7 +737,6 @@ class _KodikPlayerPageState extends State<KodikPlayerPage> {
     super.initState();
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setMediaPlaybackRequiresUserGesture(false)
       ..setNavigationDelegate(NavigationDelegate(onWebResourceError: (error) {}))
       ..loadRequest(Uri.parse(widget.url));
   }
