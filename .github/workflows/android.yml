@@ -278,6 +278,10 @@ jobs:
           PY
 
 
+      - name: Apply responsive layouts for phones, tablets and TVs
+        working-directory: source
+        run: python ../scripts/patch_responsive.py
+
       - name: Fix intl constraint for Flutter 3.24.5
         working-directory: source
         run: |
