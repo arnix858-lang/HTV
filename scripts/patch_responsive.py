@@ -9,7 +9,7 @@ def patch(path, old, new, label):
 p=Path("pubspec.yaml")
 s=p.read_text()
 if "  marquee:" not in s:
-    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0")
+    s=s.replace("  pretty_qr_code: ^3.3.0", "  pretty_qr_code: ^3.3.0\n  marquee: ^2.3.0\n  font_awesome_flutter: 10.7.0\n  shared_preferences: ^2.3.2")
 p.write_text(s)
 
 p=Path("lib/pages/settings/widgets/settings.dart")
@@ -191,6 +191,7 @@ cinema_page = r"""import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 const String tmdbKey = String.fromEnvironment('TMDB_API_KEY', defaultValue: 'de83af9bf3f4cf2d61cb8a9467045768');
@@ -209,9 +210,15 @@ class _CinemaPageState extends State<CinemaPage> {
   String heading = 'Популярные фильмы';
   String? error;
   bool loading = false;
+  List<String> favoriteIds = [];
 
   @override
-  void initState() { super.initState(); load(); }
+  void initState() { super.initState(); _loadFavorites(); load(); }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => favoriteIds = prefs.getStringList('cinema_favorites') ?? []);
+  }
   @override
   void dispose() { search.dispose(); super.dispose(); }
 
@@ -227,9 +234,17 @@ class _CinemaPageState extends State<CinemaPage> {
       else if (section == 'Мультфильмы') { path = '/discover/movie'; params['with_genres'] = '16'; params['sort_by'] = 'popularity.desc'; heading = 'Мультфильмы'; }
       else if (section == 'Каталог') { path = '/trending/all/week'; heading = 'Популярное сейчас'; }
       else { path = '/movie/popular'; heading = 'Популярные фильмы'; }
-      final response = await http.get(Uri.https('api.themoviedb.org', '/3' + path, params)).timeout(const Duration(seconds: 20));
+      final cacheKey = 'tmdb_catalog_' + path + '_' + (params['query'] ?? '') + '_' + (params['with_genres'] ?? '');
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(cacheKey);
+      if (cached != null && mounted) {
+        final cachedData = jsonDecode(cached) as Map<String, dynamic>;
+        setState(() { items = (cachedData['results'] as List? ?? []).where((x) => x['media_type'] != 'person').toList(); loading = false; });
+      }
+      final response = await http.get(Uri.https('api.themoviedb.org', '/3' + path, params)).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) throw Exception('TMDB HTTP ' + response.statusCode.toString());
       final data = jsonDecode(response.body) as Map<String, dynamic>;
+      await prefs.setString(cacheKey, response.body);
       if (!mounted) return;
       setState(() { items = (data['results'] as List? ?? []).where((x) => x['media_type'] != 'person').toList(); loading = false; });
     } catch (e) { if (mounted) setState(() { loading = false; error = e.toString(); }); }
@@ -325,15 +340,39 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
   Map<String, dynamic>? details;
   bool loading = true;
   String? error;
+  bool isFavorite = false;
 
   @override
-  void initState() { super.initState(); _loadDetails(); }
+  void initState() { super.initState(); _loadDetails(); _loadFavorite(); }
+
+  String get _favoriteKey => widget.mediaType + '_' + widget.item['id'].toString();
+
+  Future<void> _loadFavorite() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => isFavorite = (prefs.getStringList('cinema_favorites') ?? []).contains(_favoriteKey));
+  }
+
+  Future<void> _toggleFavorite() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('cinema_favorites') ?? [];
+    if (ids.contains(_favoriteKey)) { ids.remove(_favoriteKey); } else { ids.add(_favoriteKey); }
+    await prefs.setStringList('cinema_favorites', ids);
+    if (mounted) setState(() => isFavorite = ids.contains(_favoriteKey));
+  }
+
+  void _watch() {
+    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Просмотр'),
+      content: const Text('Для запуска фильма или серии необходимо подключить источник видеопотока. TMDB предоставляет каталог и описания, но не сами видео.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Понятно'))],
+    ));
+  }
 
   Future<void> _loadDetails() async {
     try {
       final id = widget.item['id'];
       final uri = Uri.https('api.themoviedb.org', '/3/' + widget.mediaType + '/' + id.toString(), {
-        'api_key': tmdbKey, 'language': 'ru-RU',
+        'api_key': tmdbKey, 'language': 'ru-RU', 'append_to_response': 'credits',
       });
       final response = await http.get(uri).timeout(const Duration(seconds: 18));
       if (response.statusCode != 200) throw Exception('TMDB HTTP ' + response.statusCode.toString());
@@ -357,6 +396,10 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
     final rating = (details?['vote_average'] ?? widget.item['vote_average'] ?? 0).toString();
     final year = _date.length >= 4 ? _date.substring(0, 4) : _date;
     final runtime = details?['runtime'] ?? ((details?['episode_run_time'] is List && (details?['episode_run_time'] as List).isNotEmpty) ? (details?['episode_run_time'] as List).first : null);
+    final tagline = (details?['tagline'] ?? '').toString();
+    final status = (details?['status'] ?? '').toString();
+    final countryList = (details?['production_countries'] as List? ?? const []).map((x) => (x['name'] ?? '').toString()).where((x) => x.isNotEmpty).take(2).join(', ');
+    final cast = (details?['credits']?['cast'] as List? ?? const []).take(3).map((x) => (x['name'] ?? '').toString()).where((x) => x.isNotEmpty).join(' • ');
 
     return Scaffold(
       backgroundColor: const Color(0xFF080A0F),
@@ -365,7 +408,7 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
           ImageFiltered(
             imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Image.network(
-              'https://image.tmdb.org/t/p/original' + backdrop,
+              'https://image.tmdb.org/t/p/w1280' + backdrop,
               fit: BoxFit.cover,
               cacheWidth: 1600,
               gaplessPlayback: true,
@@ -432,17 +475,28 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
                   children: [
                     Text(_title, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 34, fontWeight: FontWeight.w800, height: 1.12)),
+                    if (tagline.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: Text(tagline, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontStyle: FontStyle.italic))),
                     SizedBox(height: compact ? 10 : 16),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       _chip(year, Icons.calendar_today_outlined),
                       _chip('★ ' + rating, Icons.star_outline_rounded),
                       if (runtime != null) _chip(runtime.toString() + ' мин.', Icons.schedule_rounded),
                       if (details?['number_of_seasons'] != null) _chip(details!['number_of_seasons'].toString() + ' сез.', Icons.tv_outlined),
+                      if (details?['number_of_episodes'] != null) _chip(details!['number_of_episodes'].toString() + ' сер.', Icons.video_library_outlined),
+                      if (status.isNotEmpty) _chip(status, Icons.info_outline),
                     ]),
                     if (genres.isNotEmpty) ...[
                       SizedBox(height: compact ? 10 : 16),
                       Wrap(spacing: 7, runSpacing: 7,
                         children: genres.take(compact ? 4 : 7).map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList()),
+                    ],
+                    if (countryList.isNotEmpty || details?['original_language'] != null) ...[
+                      SizedBox(height: 8),
+                      Text([if (countryList.isNotEmpty) countryList, if (details?['original_language'] != null) 'Язык: ' + details!['original_language'].toString().toUpperCase()].join('  •  '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                    ],
+                    if (cast.isNotEmpty) ...[
+                      SizedBox(height: 8),
+                      Text('В ролях: ' + cast, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                     SizedBox(height: compact ? 12 : 20),
                     Text('О фильме', style: TextStyle(color: Colors.white, fontSize: compact ? 17 : 22, fontWeight: FontWeight.bold)),
@@ -451,6 +505,21 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
                       maxLines: compact ? 5 : 7,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Colors.white.withOpacity(.82), fontSize: compact ? 13 : 17, height: 1.45)),
+                    SizedBox(height: compact ? 12 : 18),
+                    Wrap(spacing: 9, runSpacing: 8, children: [
+                      OutlinedButton.icon(
+                        onPressed: _toggleFavorite,
+                        icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? Colors.pinkAccent : Colors.white),
+                        label: Text(isFavorite ? 'В избранном' : 'В избранное', style: const TextStyle(color: Colors.white)),
+                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white38), padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: compact ? 8 : 12)),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _watch,
+                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+                        label: const Text('Смотреть', style: TextStyle(color: Colors.white)),
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE65A32), padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 20, vertical: compact ? 9 : 13)),
+                      ),
+                    ]),
                     if (loading) const Padding(padding: EdgeInsets.only(top: 12),
                       child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
                     if (error != null) Padding(padding: const EdgeInsets.only(top: 8),
