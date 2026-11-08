@@ -184,3 +184,208 @@ if "_settingIcon(String title)" not in s:
     s=s.replace(anchor,icons+anchor,1)
 p.write_text(s)
 print("Marquee text and Font Awesome setting icons applied.")
+
+
+# Replace the direct player launch with a three-section home screen.
+home_page = r"""import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:video_player_example/pages/iptv/view.dart';
+import 'package:video_player_example/pages/settings/view.dart';
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  void _openPage(BuildContext context, Widget page) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
+
+  void _showComingSoon(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF20232B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text('Кинотеатр', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Раздел находится в разработке.\n\nСкоро здесь появятся фильмы, сериалы, мультфильмы и другой контент.',
+          style: TextStyle(color: Colors.white70, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Понятно'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10.w),
+        child: Material(
+          color: const Color(0xFF1B1F29),
+          borderRadius: BorderRadius.circular(24.r),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(24.r),
+            child: Container(
+              constraints: BoxConstraints(minHeight: 250.h),
+              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 24.h),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withOpacity(0.07)),
+                borderRadius: BorderRadius.circular(24.r),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 92.w,
+                    height: 92.w,
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(25.r),
+                    ),
+                    child: Icon(icon, color: accent, size: 48.sp),
+                  ),
+                  SizedBox(height: 22.h),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 30.sp, fontWeight: FontWeight.w700),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white54, fontSize: 18.sp),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF10131A),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 1450.w),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 34.w, vertical: 22.h),
+                  child: Column(
+                    children: [
+                      SizedBox(height: 12.h),
+                      Row(
+                        children: [
+                          Icon(Icons.live_tv_rounded, color: const Color(0xFFFF6B35), size: 34.sp),
+                          SizedBox(width: 12.w),
+                          Text(
+                            'HTV',
+                            style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w800, letterSpacing: 2),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Выберите раздел',
+                        style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w700),
+                      ),
+                      SizedBox(height: 30.h),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _menuCard(
+                            context: context,
+                            icon: Icons.live_tv_rounded,
+                            title: 'ТВ',
+                            subtitle: 'Телеканалы и прямой эфир',
+                            accent: const Color(0xFFFF7043),
+                            onTap: () => _openPage(context, const IptvPage()),
+                          ),
+                          _menuCard(
+                            context: context,
+                            icon: Icons.local_movies_rounded,
+                            title: 'Кинотеатр',
+                            subtitle: 'Фильмы, сериалы и мультфильмы',
+                            accent: const Color(0xFF8B7CFF),
+                            onTap: () => _showComingSoon(context),
+                          ),
+                          _menuCard(
+                            context: context,
+                            icon: Icons.settings_rounded,
+                            title: 'Настройки',
+                            subtitle: 'Настройка приложения и источников',
+                            accent: const Color(0xFF55B8E8),
+                            onTap: () => _openPage(context, const SettingsPage()),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        'HTV • Бесплатное приложение',
+                        style: TextStyle(color: Colors.white30, fontSize: 16.sp),
+                      ),
+                      SizedBox(height: 10.h),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+"""
+home_dir = Path("lib/pages/home")
+home_dir.mkdir(parents=True, exist_ok=True)
+(home_dir / "view.dart").write_text(home_page)
+
+main = Path("lib/main.dart")
+main_text = main.read_text()
+home_import = "import 'package:video_player_example/pages/home/view.dart';"
+if home_import not in main_text:
+    main_text = main_text.replace(
+        "import 'package:video_player_example/pages/index.dart';",
+        "import 'package:video_player_example/pages/index.dart';\n" + home_import,
+        1,
+    )
+old_home = """home: const DelayRenderer(
+              child: DoubleBackExit(
+                child: IptvPage(),
+              ),
+            ),"""
+new_home = """home: const DelayRenderer(
+              child: DoubleBackExit(
+                child: HomePage(),
+              ),
+            ),"""
+if old_home in main_text:
+    main_text = main_text.replace(old_home, new_home, 1)
+elif "child: HomePage()," not in main_text:
+    raise SystemExit("Could not locate initial IPTV home widget in main.dart")
+main.write_text(main_text)
+print("Three-button HTV home screen installed.")
