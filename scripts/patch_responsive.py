@@ -145,8 +145,10 @@ if method_anchor not in s:
     raise SystemExit("About dialog insertion point missing")
 s = s.replace(method_anchor, about_method + method_anchor, 1)
 
-more_anchor = "SettingGroup(name: '更多', items: ["
-more_insert = """SettingGroup(name: '更多', items: [
+# The workflow translates the Chinese group label before this script runs.
+# Match the translated group name, not the original upstream label.
+more_anchor = "SettingGroup(name: 'Дополнительно', items: ["
+more_insert = """SettingGroup(name: 'Дополнительно', items: [
         SettingItem(
           title: 'О приложении',
           value: () => 'Бесплатно',
@@ -154,7 +156,7 @@ more_insert = """SettingGroup(name: '更多', items: [
           onTap: () => _showAboutApp(),
         ),"""
 if more_anchor not in s:
-    raise SystemExit("About settings group insertion point missing")
+    raise SystemExit("About settings group insertion point missing (translated group)")
 if "title: 'О приложении'" not in s:
     s=s.replace(more_anchor, more_insert, 1)
 
