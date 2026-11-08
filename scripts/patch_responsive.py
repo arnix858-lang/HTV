@@ -175,6 +175,7 @@ icons="""  IconData _settingIcon(String title) {
     if (title.contains('обратное') || title.contains('переключение')) return FontAwesomeIcons.repeat;
     if (title.contains('обновлен')) return FontAwesomeIcons.arrowsRotate;
     if (title.contains('сообщество') || title.contains('обратная связь')) return FontAwesomeIcons.comments;
+    if (title.contains('О приложении')) return FontAwesomeIcons.circleInfo;
     return FontAwesomeIcons.sliders;
   }
 
