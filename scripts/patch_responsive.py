@@ -471,103 +471,60 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
               const SizedBox(width: 16),
             ]),
           ),
-          Expanded(child: LayoutBuilder(builder: (context, constraints) {
-            final posterWidth = (screenWidth * (compact ? 0.32 : isTv ? 0.25 : 0.23)).clamp(100.0, isTv ? 340.0 : 260.0);
-            final posterHeight = (constraints.maxHeight * (compact ? 0.48 : 0.78)).clamp(150.0, 430.0);
-            return Padding(
-              padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 10, compact ? 16 : 42, isTv ? 110 : 92),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                if (poster.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      'https://image.tmdb.org/t/p/w500' + poster,
-                      width: posterWidth,
-                      height: posterHeight,
-                      fit: BoxFit.cover,
-                      cacheWidth: 520,
-                      filterQuality: FilterQuality.medium,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: posterWidth, height: posterHeight,
-                        color: const Color(0xFF1B1F29),
-                        child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 42),
-                      ),
-                    ),
-                  ),
-                SizedBox(width: compact ? 16 : 34),
-                Expanded(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 34, fontWeight: FontWeight.w800, height: 1.12)),
-                    if (tagline.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: Text(tagline, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontStyle: FontStyle.italic))),
-                    SizedBox(height: compact ? 10 : 16),
+          Expanded(child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 12, compact ? 16 : 42, 34),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              LayoutBuilder(builder: (context, constraints) {
+                final posterWidth = (constraints.maxWidth * (compact ? 0.38 : isTv ? 0.25 : 0.23)).clamp(112.0, isTv ? 340.0 : 260.0);
+                final posterHeight = posterWidth * 1.48;
+                return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (poster.isNotEmpty)
+                    ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(
+                      'https://image.tmdb.org/t/p/w500' + poster, width: posterWidth, height: posterHeight,
+                      fit: BoxFit.cover, cacheWidth: 520, filterQuality: FilterQuality.medium, gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => Container(width: posterWidth, height: posterHeight, color: const Color(0xFF1B1F29), child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 42)),
+                    )),
+                  SizedBox(width: compact ? 16 : 34),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_title, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 34, fontWeight: FontWeight.w800, height: 1.12)),
+                    if (tagline.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 7), child: Text(tagline, style: const TextStyle(color: Colors.white60, fontStyle: FontStyle.italic))),
+                    SizedBox(height: 12),
                     Wrap(spacing: 8, runSpacing: 8, children: [
-                      _chip(year, Icons.calendar_today_outlined),
-                      _chip('★ ' + rating, Icons.star_outline_rounded),
+                      _chip(year, Icons.calendar_today_outlined), _chip('★ ' + rating, Icons.star_outline_rounded),
                       if (runtime != null) _chip(runtime.toString() + ' мин.', Icons.schedule_rounded),
                       if (details?['number_of_seasons'] != null) _chip(details!['number_of_seasons'].toString() + ' сез.', Icons.tv_outlined),
                       if (details?['number_of_episodes'] != null) _chip(details!['number_of_episodes'].toString() + ' сер.', Icons.video_library_outlined),
                       if (status.isNotEmpty) _chip(status, Icons.info_outline),
                     ]),
-                    if (genres.isNotEmpty) ...[
-                      SizedBox(height: compact ? 10 : 16),
-                      Wrap(spacing: 7, runSpacing: 7,
-                        children: genres.take(compact ? 4 : 7).map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList()),
-                    ],
-                    if (countryList.isNotEmpty || details?['original_language'] != null) ...[
-                      SizedBox(height: 8),
-                      Text([if (countryList.isNotEmpty) countryList, if (details?['original_language'] != null) 'Язык: ' + details!['original_language'].toString().toUpperCase()].join('  •  '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                    ],
-                    if (cast.isNotEmpty) ...[
-                      SizedBox(height: 8),
-                      Text('В ролях: ' + cast, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    ],
-                    SizedBox(height: compact ? 12 : 20),
-                    Text('О фильме', style: TextStyle(color: Colors.white, fontSize: compact ? 17 : 22, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 7),
-                    Text(overview,
-                      maxLines: compact ? 5 : 7,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withOpacity(.82), fontSize: compact ? 13 : 17, height: 1.45)),
-                    SizedBox(height: compact ? 12 : 18),
-                    const SizedBox(height: 4),
-                    if (loading) const Padding(padding: EdgeInsets.only(top: 12),
-                      child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
-                    if (error != null) Padding(padding: const EdgeInsets.only(top: 8),
-                      child: Text('Не удалось загрузить данные', maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white54))),
-                  ],
-                )),
+                    if (genres.isNotEmpty) ...[SizedBox(height: 12), Wrap(spacing: 7, runSpacing: 7, children: genres.take(compact ? 4 : 7).map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList())],
+                  ])),
+                ]);
+              }),
+              SizedBox(height: 22),
+              Wrap(spacing: 12, runSpacing: 10, children: [
+                watchButton,
+                favoriteButton,
               ]),
-            );
-          })),
+              SizedBox(height: 24),
+              Text('О фильме', style: TextStyle(color: Colors.white, fontSize: compact ? 19 : 24, fontWeight: FontWeight.bold)),
+              SizedBox(height: 9),
+              Text(overview, style: TextStyle(color: Colors.white.withOpacity(.86), fontSize: compact ? 14 : 17, height: 1.55)),
+              if (countryList.isNotEmpty || details?['original_language'] != null) ...[
+                SizedBox(height: 18),
+                Text([if (countryList.isNotEmpty) countryList, if (details?['original_language'] != null) 'Язык: ' + details!['original_language'].toString().toUpperCase()].join('  •  '), style: const TextStyle(color: Colors.white60, fontSize: 13)),
+              ],
+              if (cast.isNotEmpty) ...[
+                SizedBox(height: 18),
+                Text('В ролях', style: TextStyle(color: Colors.white, fontSize: compact ? 18 : 22, fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                Text(cast, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              ],
+              if (loading) const Padding(padding: EdgeInsets.only(top: 18), child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
+              if (error != null) const Padding(padding: EdgeInsets.only(top: 10), child: Text('Не удалось загрузить данные', style: TextStyle(color: Colors.white54))),
+            ]),
+          )),
         ])),
-        Positioned(
-          left: isTv ? 42 : 16,
-          right: isTv ? 42 : 16,
-          bottom: isTv ? 28 : 12,
-          child: SafeArea(
-            top: false,
-            child: Center(
-              child: FocusTraversalGroup(
-                policy: OrderedTraversalPolicy(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FocusTraversalOrder(order: const NumericFocusOrder(1), child: favoriteButton),
-                    SizedBox(width: isTv ? 24 : 12),
-                    FocusTraversalOrder(order: const NumericFocusOrder(2), child: watchButton),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
       ]),
     );
   }
