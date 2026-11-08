@@ -187,183 +187,175 @@ print("Marquee text and Font Awesome setting icons applied.")
 
 
 # Replace the direct player launch with a three-section home screen.
+cinema_page = r"""import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:http/http.dart' as http;
+
+const String tmdbKey = String.fromEnvironment('TMDB_API_KEY');
+const String posterBase = 'https://image.tmdb.org/t/p/w500';
+
+class CinemaPage extends StatefulWidget {
+  const CinemaPage({super.key});
+  @override
+  State<CinemaPage> createState() => _CinemaPageState();
+}
+
+class _CinemaPageState extends State<CinemaPage> {
+  final search = TextEditingController();
+  List items = [];
+  String section = 'Фильмы';
+  String heading = 'Популярные фильмы';
+  String? error;
+  bool loading = false;
+
+  @override
+  void initState() { super.initState(); load(); }
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+
+  Future<void> load({String? query}) async {
+    if (tmdbKey.isEmpty) { setState(() => error = 'Не задан ключ TMDB_API_KEY в GitHub Actions.'); return; }
+    setState(() { loading = true; error = null; });
+    try {
+      String path;
+      final params = <String, String>{'api_key': tmdbKey, 'language': 'ru-RU', 'page': '1'};
+      if (query != null && query.trim().isNotEmpty) {
+        path = '/search/multi'; params['query'] = query.trim(); heading = 'Результаты поиска';
+      } else if (section == 'Сериалы') { path = '/tv/popular'; heading = 'Популярные сериалы'; }
+      else if (section == 'Мультфильмы') { path = '/discover/movie'; params['with_genres'] = '16'; params['sort_by'] = 'popularity.desc'; heading = 'Мультфильмы'; }
+      else if (section == 'Каталог') { path = '/trending/all/week'; heading = 'Популярное сейчас'; }
+      else { path = '/movie/popular'; heading = 'Популярные фильмы'; }
+      final response = await http.get(Uri.https('api.themoviedb.org', '/3' + path, params)).timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) throw Exception('TMDB HTTP ' + response.statusCode.toString());
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() { items = (data['results'] as List? ?? []).where((x) => x['media_type'] != 'person').toList(); loading = false; });
+    } catch (e) { if (mounted) setState(() { loading = false; error = e.toString(); }); }
+  }
+
+  void choose(String value) { setState(() { section = value; search.clear(); }); load(); }
+
+  Widget nav(String label, IconData icon) {
+    final active = section == label;
+    return Padding(padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      child: Material(color: active ? Colors.white.withOpacity(.14) : Colors.transparent, borderRadius: BorderRadius.circular(12.r),
+        child: InkWell(onTap: () => choose(label), child: Padding(padding: EdgeInsets.all(15.w),
+          child: Row(children: [Icon(icon, color: Colors.white), SizedBox(width: 14.w),
+            Text(label, style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: active ? FontWeight.bold : FontWeight.normal))]),
+        )),
+      ));
+  }
+
+  void details(Map item) {
+    final name = (item['title'] ?? item['name'] ?? 'Без названия').toString();
+    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF1B1F29),
+      title: Text(name, style: const TextStyle(color: Colors.white)),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (item['poster_path'] != null) Image.network(posterBase + item['poster_path'].toString(), height: 230),
+        Text((item['overview'] ?? 'Описание отсутствует').toString(), style: const TextStyle(color: Colors.white70)),
+        Text('Рейтинг: ' + (item['vote_average'] ?? '—').toString(), style: const TextStyle(color: Colors.white)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Закрыть'))],
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF10131A),
+    body: SafeArea(child: Row(children: [
+      Container(width: 230.w, color: const Color(0xFF0B0D12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(padding: EdgeInsets.all(22.w), child: const Row(children: [Icon(Icons.live_tv, color: Colors.white), SizedBox(width: 10), Text('HTV', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))])),
+        Padding(padding: EdgeInsets.all(14.w), child: Text('КИНОТЕАТР', style: TextStyle(color: Colors.white38, fontSize: 13.sp, letterSpacing: 2))),
+        nav('Фильмы', Icons.movie_outlined),
+        nav('Сериалы', Icons.tv_outlined),
+        nav('Мультфильмы', Icons.animation_outlined),
+        nav('Каталог', Icons.grid_view),
+        nav('Поиск', Icons.search),
+        const Spacer(),
+        Padding(padding: EdgeInsets.all(14.w), child: OutlinedButton.icon(onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.white), label: const Text('На главную', style: TextStyle(color: Colors.white)))),
+      ])),
+      Expanded(child: Column(children: [
+        Padding(padding: EdgeInsets.all(22.w), child: Row(children: [
+          Expanded(child: Text(heading, style: TextStyle(color: Colors.white, fontSize: 27.sp, fontWeight: FontWeight.bold))),
+          SizedBox(width: 280.w, child: TextField(controller: search, style: const TextStyle(color: Colors.white),
+            onSubmitted: (v) => load(query: v),
+            decoration: InputDecoration(hintText: 'Поиск фильмов и сериалов', hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70), filled: true, fillColor: const Color(0xFF1B1F29),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)))),
+          IconButton(onPressed: () => load(query: search.text), icon: const Icon(Icons.arrow_forward, color: Colors.white)),
+        ])),
+        Expanded(child: loading && items.isEmpty ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : error != null ? Center(child: Text(error!, style: const TextStyle(color: Colors.white70)))
+          : GridView.builder(padding: EdgeInsets.all(22.w),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 185.w, mainAxisExtent: 280.h, crossAxisSpacing: 16.w, mainAxisSpacing: 16.h),
+            itemCount: items.length, itemBuilder: (ctx, i) {
+              final item = items[i] as Map;
+              final poster = item['poster_path'];
+              final name = (item['title'] ?? item['name'] ?? 'Без названия').toString();
+              return InkWell(onTap: () => details(item), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(12.r), child: Container(width: double.infinity, color: const Color(0xFF1B1F29),
+                  child: poster == null ? const Icon(Icons.movie, color: Colors.white38) : Image.network(posterBase + poster.toString(), fit: BoxFit.cover)))),
+                SizedBox(height: 7.h),
+                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 15.sp)),
+                Text('★ ' + (item['vote_average'] ?? 0).toString(), style: TextStyle(color: Colors.white60, fontSize: 13.sp)),
+              ]));
+            })),
+      ])),
+    ])));
+}
+"""
+
 home_page = r"""import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player_example/pages/iptv/view.dart';
 import 'package:video_player_example/pages/settings/view.dart';
+import 'package:video_player_example/pages/cinema/view.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+  void open(BuildContext context, Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
-  void _openPage(BuildContext context, Widget page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF20232B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('Кинотеатр', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Раздел находится в разработке.\n\nСкоро здесь появятся фильмы, сериалы, мультфильмы и другой контент.',
-          style: TextStyle(color: Colors.white70, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Понятно'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _menuCard({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required Color accent,
-  }) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10.w),
-        child: Material(
-          color: const Color(0xFF1B1F29),
-          borderRadius: BorderRadius.circular(24.r),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(24.r),
-            child: Container(
-              constraints: BoxConstraints(minHeight: 250.h),
-              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 24.h),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white.withOpacity(0.07)),
-                borderRadius: BorderRadius.circular(24.r),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 92.w,
-                    height: 92.w,
-                    decoration: BoxDecoration(
-                      color: accent.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(25.r),
-                    ),
-                    child: Icon(icon, color: accent, size: 48.sp),
-                  ),
-                  SizedBox(height: 22.h),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 30.sp, fontWeight: FontWeight.w700),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white54, fontSize: 18.sp),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget card(IconData icon, String title, String subtitle, VoidCallback tap) => Expanded(
+    child: Padding(padding: EdgeInsets.symmetric(horizontal: 10.w),
+      child: Material(color: const Color(0xFF1B1F29), borderRadius: BorderRadius.circular(24.r), clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: tap, child: Container(height: 280.h, padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(border: Border.all(color: Colors.white12), borderRadius: BorderRadius.circular(24.r)),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(width: 92.w, height: 92.w, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(24.r)),
+              child: Icon(icon, color: Colors.white, size: 48.sp)),
+            SizedBox(height: 22.h),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 30.sp, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8.h),
+            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 18.sp)),
+          ]),
+        )),
+      )),
+  );
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF10131A),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 1450.w),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 34.w, vertical: 22.h),
-                  child: Column(
-                    children: [
-                      SizedBox(height: 12.h),
-                      Row(
-                        children: [
-                          Icon(Icons.live_tv_rounded, color: const Color(0xFFFF6B35), size: 34.sp),
-                          SizedBox(width: 12.w),
-                          Text(
-                            'HTV',
-                            style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w800, letterSpacing: 2),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Выберите раздел',
-                        style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w700),
-                      ),
-                      SizedBox(height: 30.h),
-                      SizedBox(
-                        height: 280.h,
-                        width: double.infinity,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                          _menuCard(
-                            context: context,
-                            icon: Icons.live_tv_rounded,
-                            title: 'ТВ',
-                            subtitle: 'Телеканалы и прямой эфир',
-                            accent: const Color(0xFFFF7043),
-                            onTap: () => _openPage(context, const IptvPage()),
-                          ),
-                          _menuCard(
-                            context: context,
-                            icon: Icons.local_movies_rounded,
-                            title: 'Кинотеатр',
-                            subtitle: 'Фильмы, сериалы и мультфильмы',
-                            accent: const Color(0xFF8B7CFF),
-                            onTap: () => _showComingSoon(context),
-                          ),
-                          _menuCard(
-                            context: context,
-                            icon: Icons.settings_rounded,
-                            title: 'Настройки',
-                            subtitle: 'Настройка приложения и источников',
-                            accent: const Color(0xFF55B8E8),
-                            onTap: () => _openPage(context, const SettingsPage()),
-                          ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'HTV • Бесплатное приложение',
-                        style: TextStyle(color: Colors.white30, fontSize: 16.sp),
-                      ),
-                      SizedBox(height: 10.h),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xFF10131A),
+    body: SafeArea(child: Padding(padding: EdgeInsets.all(30.w), child: Column(children: [
+      Row(children: [const Icon(Icons.live_tv, color: Colors.white, size: 34), SizedBox(width: 12.w),
+        Text('HTV', style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.w800, letterSpacing: 2))]),
+      const Spacer(),
+      Text('Выберите раздел', style: TextStyle(color: Colors.white, fontSize: 34.sp, fontWeight: FontWeight.bold)),
+      SizedBox(height: 30.h),
+      SizedBox(height: 280.h, child: Row(children: [
+        card(Icons.live_tv, 'ТВ', 'Телеканалы и прямой эфир', () => open(context, const IptvPage())),
+        card(Icons.local_movies, 'Кинотеатр', 'Фильмы, сериалы и мультфильмы', () => open(context, const CinemaPage())),
+        card(Icons.settings, 'Настройки', 'Настройка приложения и источников', () => open(context, const SettingsPage())),
+      ])),
+      const Spacer(),
+      Text('HTV • Бесплатное приложение', style: TextStyle(color: Colors.white30, fontSize: 16.sp)),
+    ]))));
 }
 """
+cinema_dir = Path("lib/pages/cinema")
+cinema_dir.mkdir(parents=True, exist_ok=True)
+(cinema_dir / "view.dart").write_text(cinema_page)
+
 home_dir = Path("lib/pages/home")
 home_dir.mkdir(parents=True, exist_ok=True)
 (home_dir / "view.dart").write_text(home_page)
