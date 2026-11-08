@@ -192,7 +192,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:http/http.dart' as http;
 
-const String tmdbKey = String.fromEnvironment('TMDB_API_KEY');
+const String tmdbKey = String.fromEnvironment('TMDB_API_KEY', defaultValue: 'de83af9bf3f4cf2d61cb8a9467045768');
 const String posterBase = 'https://image.tmdb.org/t/p/w500';
 
 class CinemaPage extends StatefulWidget {
@@ -273,8 +273,21 @@ class _CinemaPageState extends State<CinemaPage> {
         nav('Каталог', Icons.grid_view),
         nav('Поиск', Icons.search),
         const Spacer(),
-        Padding(padding: EdgeInsets.all(14.w), child: OutlinedButton.icon(onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.white), label: const Text('На главную', style: TextStyle(color: Colors.white)))),
+        Padding(padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 18.h),
+          child: SizedBox(width: double.infinity, height: 54.h,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 21),
+              label: const FittedBox(fit: BoxFit.scaleDown, child: Text('На главную', maxLines: 1, style: TextStyle(color: Colors.white, fontSize: 16))),
+              style: OutlinedButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                side: const BorderSide(color: Colors.white24),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              ),
+            ),
+          ),
+        ),
       ])),
       Expanded(child: Column(children: [
         Padding(padding: EdgeInsets.all(22.w), child: Row(children: [
@@ -296,7 +309,7 @@ class _CinemaPageState extends State<CinemaPage> {
               final name = (item['title'] ?? item['name'] ?? 'Без названия').toString();
               return InkWell(onTap: () => details(item), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(12.r), child: Container(width: double.infinity, color: const Color(0xFF1B1F29),
-                  child: poster == null ? const Icon(Icons.movie, color: Colors.white38) : Image.network(posterBase + poster.toString(), fit: BoxFit.cover)))),
+                  child: poster == null ? const Icon(Icons.movie_outlined, color: Colors.white38, size: 42) : Image.network(posterBase + poster.toString(), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 38)))))),
                 SizedBox(height: 7.h),
                 Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 15.sp)),
                 Text('★ ' + (item['vote_average'] ?? 0).toString(), style: TextStyle(color: Colors.white60, fontSize: 13.sp)),
