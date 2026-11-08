@@ -484,6 +484,15 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Cache Gradle distributions and dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('source/android/gradle/wrapper/gradle-wrapper.properties', 'source/android/build.gradle', 'source/android/settings.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
       - name: Build universal APK
         working-directory: source
         env:
