@@ -188,6 +188,7 @@ print("Marquee text and Font Awesome setting icons applied.")
 
 # Replace the direct player launch with a three-section home screen.
 cinema_page = r"""import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:http/http.dart' as http;
@@ -357,56 +358,112 @@ class _CinemaDetailsPageState extends State<CinemaDetailsPage> {
     final year = _date.length >= 4 ? _date.substring(0, 4) : _date;
     final runtime = details?['runtime'] ?? ((details?['episode_run_time'] is List && (details?['episode_run_time'] as List).isNotEmpty) ? (details?['episode_run_time'] as List).first : null);
 
-    return Scaffold(backgroundColor: const Color(0xFF10131A),
-      body: CustomScrollView(slivers: [
-        SliverAppBar(pinned: true, backgroundColor: const Color(0xFF10131A), expandedHeight: 330,
-          leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Colors.white), onPressed: () => Navigator.pop(context)),
-          flexibleSpace: FlexibleSpaceBar(background: Stack(fit: StackFit.expand, children: [
-            if (backdrop.isNotEmpty) Image.network('https://image.tmdb.org/t/p/w1280' + backdrop,
-              fit: BoxFit.cover, cacheWidth: 1280, filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-            const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              colors: [Color(0x22000000), Color(0xFF10131A)], stops: [0.15, 1.0]))),
-            const SizedBox.shrink(),
-          ]))),
-        SliverToBoxAdapter(child: LayoutBuilder(builder: (context, constraints) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final posterWidth = (screenWidth * 0.29).clamp(92.0, 220.0);
-          final posterHeight = posterWidth * 1.5;
-          final compact = screenWidth < 600;
-          return Padding(padding: EdgeInsets.fromLTRB(compact ? 14 : 28, 12, compact ? 14 : 28, 34),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (poster.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(14),
-              child: Image.network('https://image.tmdb.org/t/p/w342' + poster,
-                width: posterWidth, height: posterHeight, fit: BoxFit.cover, cacheWidth: 440,
-                filterQuality: FilterQuality.medium, gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => Container(width: posterWidth, height: posterHeight,
-                  color: const Color(0xFF1B1F29), child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 42)))),
-            SizedBox(width: compact ? 14 : 26),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_title, style: TextStyle(color: Colors.white, fontSize: compact ? 20 : 28, fontWeight: FontWeight.w800)),
-              SizedBox(height: 12.h),
-              Wrap(spacing: 9.w, runSpacing: 8.h, children: [
-                _chip(year, Icons.calendar_today_outlined), _chip('★ ' + rating, Icons.star_outline_rounded),
-                if (runtime != null) _chip(runtime.toString() + ' мин.', Icons.schedule_rounded),
-                if (details?['number_of_seasons'] != null) _chip(details!['number_of_seasons'].toString() + ' сез.', Icons.tv_outlined),
+    return Scaffold(
+      backgroundColor: const Color(0xFF080A0F),
+      body: Stack(fit: StackFit.expand, children: [
+        if (backdrop.isNotEmpty)
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Image.network(
+              'https://image.tmdb.org/t/p/original' + backdrop,
+              fit: BoxFit.cover,
+              cacheWidth: 1600,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        const DecoratedBox(decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0x99060910), Color(0xE6080A0F), Color(0xFF080A0F)],
+            stops: [0.0, 0.48, 1.0],
+          ),
+        )),
+        SafeArea(child: Column(children: [
+          SizedBox(
+            height: 54,
+            child: Row(children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                _title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+              )),
+              const SizedBox(width: 16),
+            ]),
+          ),
+          Expanded(child: LayoutBuilder(builder: (context, constraints) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final compact = screenWidth < 600;
+            final posterWidth = (screenWidth * (compact ? 0.32 : 0.23)).clamp(100.0, 260.0);
+            final posterHeight = (constraints.maxHeight * (compact ? 0.48 : 0.78)).clamp(150.0, 430.0);
+            return Padding(
+              padding: EdgeInsets.fromLTRB(compact ? 16 : 42, 10, compact ? 16 : 42, 22),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                if (poster.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      'https://image.tmdb.org/t/p/w500' + poster,
+                      width: posterWidth,
+                      height: posterHeight,
+                      fit: BoxFit.cover,
+                      cacheWidth: 520,
+                      filterQuality: FilterQuality.medium,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: posterWidth, height: posterHeight,
+                        color: const Color(0xFF1B1F29),
+                        child: const Icon(Icons.movie_outlined, color: Colors.white54, size: 42),
+                      ),
+                    ),
+                  ),
+                SizedBox(width: compact ? 16 : 34),
+                Expanded(child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 34, fontWeight: FontWeight.w800, height: 1.12)),
+                    SizedBox(height: compact ? 10 : 16),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      _chip(year, Icons.calendar_today_outlined),
+                      _chip('★ ' + rating, Icons.star_outline_rounded),
+                      if (runtime != null) _chip(runtime.toString() + ' мин.', Icons.schedule_rounded),
+                      if (details?['number_of_seasons'] != null) _chip(details!['number_of_seasons'].toString() + ' сез.', Icons.tv_outlined),
+                    ]),
+                    if (genres.isNotEmpty) ...[
+                      SizedBox(height: compact ? 10 : 16),
+                      Wrap(spacing: 7, runSpacing: 7,
+                        children: genres.take(compact ? 4 : 7).map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList()),
+                    ],
+                    SizedBox(height: compact ? 12 : 20),
+                    Text('О фильме', style: TextStyle(color: Colors.white, fontSize: compact ? 17 : 22, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 7),
+                    Text(overview,
+                      maxLines: compact ? 5 : 7,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white.withOpacity(.82), fontSize: compact ? 13 : 17, height: 1.45)),
+                    if (loading) const Padding(padding: EdgeInsets.only(top: 12),
+                      child: LinearProgressIndicator(color: Colors.white38, backgroundColor: Colors.white12)),
+                    if (error != null) Padding(padding: const EdgeInsets.only(top: 8),
+                      child: Text('Не удалось загрузить данные', maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54))),
+                  ],
+                )),
               ]),
-              SizedBox(height: 18.h),
-              if (genres.isNotEmpty) Wrap(spacing: 8.w, runSpacing: 8.h,
-                children: genres.map((g) => _chip((g['name'] ?? '').toString(), Icons.local_offer_outlined)).toList()),
-              SizedBox(height: 20.h),
-              Text('О фильме', style: TextStyle(color: Colors.white, fontSize: 21.sp, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8.h),
-              Text(overview, style: TextStyle(color: Colors.white70, fontSize: compact ? 13 : 17, height: 1.5)),
-              if (loading) const Padding(padding: EdgeInsets.only(top: 16),
-                child: LinearProgressIndicator(color: Colors.white24, backgroundColor: Colors.white10)),
-              if (error != null) Padding(padding: const EdgeInsets.only(top: 12),
-                child: Text('Не удалось загрузить дополнительные данные: ' + error!, style: const TextStyle(color: Colors.white54))),
-            ])),
-          ]));
-        })),
-      ]));
+            );
+          })),
+        ])),
+      ]),
+    );
   }
 
   Widget _chip(String text, IconData icon) => Container(
